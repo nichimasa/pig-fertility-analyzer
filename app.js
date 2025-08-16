@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let farm2BoarList = [];
     let farm2WeekList = [];
 
-    document.addEventListener('DOMContentLoaded', function() {
     // ユーティリティ関数を先に定義
     // 雄豚名をアルファベット順→数字順にソートする関数
     function sortBoarNames(a, b) {
@@ -90,8 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return numA - numB;
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
