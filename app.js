@@ -1,4 +1,34 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // ユーティリティ関数を最初に定義
+    function sortBoarNames(a, b) {
+        // 特殊ケース: '不明'は常に最後に
+        if (a === '不明') return 1;
+        if (b === '不明') return -1;
+        
+        // アルファベットと数字を分離する正規表現
+        const regExp = /([A-Za-z]+)(\d*)/;
+        
+        const matchA = a.match(regExp);
+        const matchB = b.match(regExp);
+        
+        // マッチしない場合は文字列としてそのまま比較
+        if (!matchA || !matchB) return a.localeCompare(b);
+        
+        const alphaA = matchA[1]; // アルファベット部分
+        const alphaB = matchB[1];
+        
+        // アルファベットが異なる場合はそれで比較
+        if (alphaA !== alphaB) return alphaA.localeCompare(alphaB);
+        
+        // アルファベットが同じ場合は数字部分を数値として比較
+        const numA = matchA[2] ? parseInt(matchA[2], 10) : 0;
+        const numB = matchB[2] ? parseInt(matchB[2], 10) : 0;
+        
+        return numA - numB;
+    }
+    
+    const fileInput = document.getElementById('csvFile');
+    
     const fileInput = document.getElementById('csvFile');
     const encodingSelect = document.getElementById('encoding');
     const startAnalysisBtn = document.getElementById('start-analysis-btn');
@@ -60,35 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let farm2ParityList = [];
     let farm2BoarList = [];
     let farm2WeekList = [];
-
-    // ユーティリティ関数を先に定義
-    // 雄豚名をアルファベット順→数字順にソートする関数
-    function sortBoarNames(a, b) {
-        // 特殊ケース: '不明'は常に最後に
-        if (a === '不明') return 1;
-        if (b === '不明') return -1;
-        
-        // アルファベットと数字を分離する正規表現
-        const regExp = /([A-Za-z]+)(\d*)/;
-        
-        const matchA = a.match(regExp);
-        const matchB = b.match(regExp);
-        
-        // マッチしない場合は文字列としてそのまま比較
-        if (!matchA || !matchB) return a.localeCompare(b);
-        
-        const alphaA = matchA[1]; // アルファベット部分
-        const alphaB = matchB[1];
-        
-        // アルファベットが異なる場合はそれで比較
-        if (alphaA !== alphaB) return alphaA.localeCompare(alphaB);
-        
-        // アルファベットが同じ場合は数字部分を数値として比較
-        const numA = matchA[2] ? parseInt(matchA[2], 10) : 0;
-        const numB = matchB[2] ? parseInt(matchB[2], 10) : 0;
-        
-        return numA - numB;
-    }
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
