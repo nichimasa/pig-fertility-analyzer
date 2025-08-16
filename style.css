@@ -295,10 +295,53 @@ button:hover {
 }
 
 #overall-stats-1, #building-stats-1, #parity-stats-1, #boar-stats-1,
-#overall-stats-2, #building-stats-2, #parity-stats-2, #boar-stats-2 {
+#overall-stats-2, #building-stats-2, #parity-stats-2, #boar-stats-2,
+#non-pregnant-stats-1, #non-pregnant-stats-2 {
     margin-bottom: 30px;
     padding-bottom: 15px;
     border-bottom: 1px solid #eee;
+}
+
+/* 不受胎母豚一覧表 */
+.table-container {
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.non-pregnant-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.non-pregnant-table th, .non-pregnant-table td {
+    padding: 8px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
+.non-pregnant-table th {
+    position: sticky;
+    top: 0;
+    background-color: #f2f2f2;
+    z-index: 10;
+}
+
+.farm-1 .non-pregnant-table th {
+    background-color: #e8f8f5;
+}
+
+.farm-2 .non-pregnant-table th {
+    background-color: #fef5f3;
+}
+
+.non-pregnant-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.non-pregnant-table tr:hover {
+    background-color: #f0f0f0;
 }
 
 /* レスポンシブ対応 */
