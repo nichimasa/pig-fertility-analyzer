@@ -90,6 +90,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return numA - numB;
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
