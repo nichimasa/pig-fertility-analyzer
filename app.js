@@ -2,13 +2,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('csvFile');
     const encodingSelect = document.getElementById('encoding');
     const startAnalysisBtn = document.getElementById('start-analysis-btn');
+    const applyFilterBtn = document.getElementById('apply-filter-btn');
     const analyzeBtn = document.getElementById('analyze-btn');
     const resetFilterBtn = document.getElementById('reset-filter-btn');
-    const summaryStats = document.getElementById('summary-stats');
-    const advancedResults = document.getElementById('advanced-results');
+    const filterSection = document.querySelector('.filter-section');
     const resultsSection = document.querySelector('.results-section');
     const advancedSection = document.querySelector('.advanced-analysis');
     const loadingIndicator = document.getElementById('loading-indicator');
+    const filterDescription = document.getElementById('filter-description');
+    
+    // 結果表示エリア
+    const overallStats = document.getElementById('overall-stats');
+    const farmStats = document.getElementById('farm-stats');
+    const buildingStats = document.getElementById('building-stats');
+    const parityStats = document.getElementById('parity-stats');
+    const boarStats = document.getElementById('boar-stats');
+    const advancedResults = document.getElementById('advanced-results');
     
     // フィルター要素
     const farmFilter = document.getElementById('farm-filter');
@@ -56,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 読み込み中の表示
         loadingIndicator.style.display = 'block';
+        filterSection.style.display = 'none';
         resultsSection.style.display = 'none';
         advancedSection.style.display = 'none';
         
@@ -108,9 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // 読み込み完了、分析結果表示
                     loadingIndicator.style.display = 'none';
-                    calculateOverallStats();
+                    filterSection.style.display = 'block';
+                    calculateAllStats();
                     resultsSection.style.display = 'block';
                     advancedSection.style.display = 'block';
+                    
+                    // フィルターの状態を更新
+                    updateFilterDescription();
                 },
                 error: function(error) {
                     console.error("Error parsing CSV:", error);
@@ -171,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-        // 日付のフォーマット
+    // 日付のフォーマット
     function formatDate(date) {
         const month = date.getMonth() + 1;
         const day = date.getDate();
@@ -215,8 +229,38 @@ document.addEventListener('DOMContentLoaded', function() {
         boarFilter.value = 'all';
         
         filteredData = [...pigData];
-        updateFilteredDataCount();
+        updateFilterDescription();
     });
+    
+    // フィルター適用ボタン
+    applyFilterBtn.addEventListener('click', function() {
+        applyFilters();
+        calculateAllStats();
+        updateFilterDescription();
+    });
+    
+    // フィルター状態の説明文を更新
+    function updateFilterDescription() {
+        let description = '条件: ';
+        const filterStates = [];
+        
+        if (farmFilter.value !== 'all') filterStates.push(`農場=${farmFilter.value}`);
+        if (buildingFilter.value !== 'all') filterStates.push(`豚舎=${buildingFilter.value}`);
+        if (monthFilter.value !== 'all') filterStates.push(`${monthFilter.value}月`);
+        if (weekFilter.value !== 'all') {
+            const weekOption = weekFilter.options[weekFilter.selectedIndex];
+            filterStates.push(weekOption.textContent);
+        }
+        if (parityFilter.value !== 'all') filterStates.push(`産次=${parityFilter.value}`);
+        if (boarFilter.value !== 'all') filterStates.push(`雄豚=${boarFilter.value}`);
+        
+        description += filterStates.length > 0 ? filterStates.join(', ') : 'すべてのデータ';
+        
+        // データ数も表示
+        description += ` (${filteredData.length}件 / 全${pigData.length}件)`;
+        
+        filterDescription.textContent = description;
+    }
     
     // フィルター適用関数
     function applyFilters() {
@@ -267,37 +311,29 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         });
         
-        updateFilteredDataCount();
         return filteredData;
     }
     
-    // フィルター適用後のデータ数を表示
-    function updateFilteredDataCount() {
-        const filterCountElem = document.querySelector('.filtered-count');
-        if (filterCountElem) {
-            filterCountElem.remove();
-        }
+    // すべての統計情報を計算・表示
+    function calculateAllStats() {
+        // 全体と農場別の統計
+        calculateOverallAndFarmStats();
         
-        const countInfo = document.createElement('div');
-        countInfo.className = 'filtered-count';
-        countInfo.textContent = `現在のフィルター条件: ${filteredData.length}件 / 全${pigData.length}件`;
+        // 豚舎別の統計
+        calculateBuildingStats();
         
-        const filterSection = document.querySelector('.filter-section');
-        filterSection.appendChild(countInfo);
+        // 産次別の統計
+        calculateParityStats();
+        
+        // 雄豚・精液別の統計
+        calculateBoarStats();
     }
     
-    // フィルター変更イベント
-    [farmFilter, buildingFilter, monthFilter, weekFilter, parityFilter, boarFilter].forEach(filter => {
-        filter.addEventListener('change', function() {
-            applyFilters();
-        });
-    });
-    
     // 全体および農場別の受胎率計算
-    function calculateOverallStats() {
+    function calculateOverallAndFarmStats() {
         // 全体データ
-        const total = pigData.length;
-        const pregnant = pigData.filter(row => {
+        const total = filteredData.length;
+        const pregnant = filteredData.filter(row => {
             const result = (row['妊娠鑑定結果'] || '').trim();
             return result === '受胎確定';
         }).length;
@@ -307,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 農場別データ
         const farmData = {};
         
-        pigData.forEach(row => {
+        filteredData.forEach(row => {
             const farm = row['農場'] || '不明';
             if (!farmData[farm]) {
                 farmData[farm] = { total: 0, pregnant: 0 };
@@ -320,30 +356,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // HTML生成 - 全体サマリー
-        let summaryHTML = `
+        // 全体の統計HTML生成
+        let overallHTML = `
+            <h3>全体受胎率</h3>
             <div class="stat-card overall">
-                <h3>全体の受胎率</h3>
                 <p class="rate">${rate}%</p>
                 <p>総数: ${total}頭</p>
                 <p>受胎: ${pregnant}頭</p>
             </div>
-            <div class="farm-summary">
-                <h3>農場別受胎率</h3>
-                <table class="data-table">
-                    <tr>
-                        <th>農場</th>
-                        <th>総数</th>
-                        <th>受胎数</th>
-                        <th>受胎率</th>
-                    </tr>
         `;
+        
+        // 全体の円グラフを追加
+        overallHTML += `<div class="chart-container" id="overall-chart-container"></div>`;
+        overallStats.innerHTML = overallHTML;
+        
+        // 農場別の統計HTML生成
+        let farmHTML = `
+            <h3>農場別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>農場</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
+        `;
+        
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
         
         for (const farm in farmData) {
             const farmRate = farmData[farm].total > 0 ? 
                 (farmData[farm].pregnant / farmData[farm].total * 100).toFixed(2) : 0;
             
-            summaryHTML += `
+            farmHTML += `
                 <tr>
                     <td>${farm}</td>
                     <td>${farmData[farm].total}</td>
@@ -351,40 +398,244 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${farmRate}%</td>
                 </tr>
             `;
+            
+            totalAll += farmData[farm].total;
+            pregnantAll += farmData[farm].pregnant;
         }
         
-        summaryHTML += `
-                </table>
-            </div>
-        `;
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        farmHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
         
-        summaryStats.innerHTML = summaryHTML;
+        farmHTML += `</table>`;
         
-        // 全体の円グラフ
-        createPieChart('overall-pie-chart', '全体受胎率', [pregnant, total - pregnant], ['受胎', '不受胎/未確認']);
+        // 農場別の円グラフを追加
+        farmHTML += `<div class="chart-container" id="farm-chart-container"></div>`;
+        farmStats.innerHTML = farmHTML;
         
-        // 農場別の円グラフ
-        createFarmPieChart(farmData);
+        // 全体の円グラフを描画
+        createPieChart('overall-chart-container', '全体受胎率', [pregnant, total - pregnant], ['受胎', '不受胎/未確認']);
+        
+        // 農場別の円グラフを描画
+        createDataDistributionPieChart('farm-chart-container', '農場別データ分布', farmData);
     }
     
-    // 全体の円グラフ作成
-    function createPieChart(elementId, title, data, labels) {
-        // グラフ用のコンテナ作成
-        const container = document.createElement('div');
-        container.className = 'chart-container';
-        container.id = elementId + '-container';
+    // 豚舎別の受胎率計算
+    function calculateBuildingStats() {
+        const buildingData = {};
         
-        const canvas = document.createElement('canvas');
-        canvas.id = elementId;
-        container.appendChild(canvas);
+        filteredData.forEach(row => {
+            const building = row['豚舎'] || '不明';
+            if (!buildingData[building]) {
+                buildingData[building] = { total: 0, pregnant: 0 };
+            }
+            
+            buildingData[building].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                buildingData[building].pregnant++;
+            }
+        });
         
-        // すでに存在する場合は削除
-        const existingContainer = document.getElementById(container.id);
-        if (existingContainer) {
-            existingContainer.remove();
+        // 豚舎別の統計HTML生成
+        let buildingHTML = `
+            <h3>豚舎別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>豚舎</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
+        `;
+        
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const building in buildingData) {
+            const rate = buildingData[building].total > 0 ? 
+                (buildingData[building].pregnant / buildingData[building].total * 100).toFixed(2) : 0;
+            
+            buildingHTML += `
+                <tr>
+                    <td>${building}</td>
+                    <td>${buildingData[building].total}</td>
+                    <td>${buildingData[building].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += buildingData[building].total;
+            pregnantAll += buildingData[building].pregnant;
         }
         
-        summaryStats.appendChild(container);
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        buildingHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        buildingHTML += `</table>`;
+        
+        // 豚舎別の円グラフを追加
+        buildingHTML += `<div class="chart-container" id="building-chart-container"></div>`;
+        buildingStats.innerHTML = buildingHTML;
+        
+        // 豚舎別の円グラフを描画
+        createDataDistributionPieChart('building-chart-container', '豚舎別データ分布', buildingData);
+    }
+    
+    // 産次別の受胎率計算
+    function calculateParityStats() {
+        const parityData = {};
+        
+        filteredData.forEach(row => {
+            const parity = row['産次'] || '不明';
+            if (!parityData[parity]) {
+                parityData[parity] = { total: 0, pregnant: 0 };
+            }
+            
+            parityData[parity].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                parityData[parity].pregnant++;
+            }
+        });
+        
+        // 産次順にソート
+        const sortedParityData = {};
+        Object.keys(parityData)
+            .sort((a, b) => {
+                const numA = parseInt(a);
+                const numB = parseInt(b);
+                if (isNaN(numA) || isNaN(numB)) {
+                    return a.localeCompare(b); // 数値に変換できない場合は文字列比較
+                }
+                return numA - numB;
+            })
+            .forEach(parity => {
+                sortedParityData[parity] = parityData[parity];
+            });
+        
+        // 産次別の統計HTML生成
+        let parityHTML = `
+            <h3>産次別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>産次</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
+        `;
+        
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const parity in sortedParityData) {
+            const rate = sortedParityData[parity].total > 0 ? 
+                (sortedParityData[parity].pregnant / sortedParityData[parity].total * 100).toFixed(2) : 0;
+            
+            parityHTML += `
+                <tr>
+                    <td>${parity}</td>
+                    <td>${sortedParityData[parity].total}</td>
+                    <td>${sortedParityData[parity].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += sortedParityData[parity].total;
+            pregnantAll += sortedParityData[parity].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        parityHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        parityHTML += `</table>`;
+        
+        // 産次別の円グラフを追加
+        parityHTML += `<div class="chart-container" id="parity-chart-container"></div>`;
+        parityStats.innerHTML = parityHTML;
+        
+        // 産次別の円グラフを描画
+        createDataDistributionPieChart('parity-chart-container', '産次別データ分布', sortedParityData);
+    }
+    
+    // 雄豚・精液別の受胎率計算
+    function calculateBoarStats() {
+        const boarData = {};
+        
+        filteredData.forEach(row => {
+            const boar = row['雄豚・精液・あて雄'] || '不明';
+            if (!boarData[boar]) {
+                boarData[boar] = { total: 0, pregnant: 0 };
+            }
+            
+            boarData[boar].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                boarData[boar].pregnant++;
+            }
+        });
+        
+        // 雄豚別の統計HTML生成
+        let boarHTML = `
+            <h3>雄豚・精液別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>雄豚・精液</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
+        `;
+        
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const boar in boarData) {
+            const rate = boarData[boar].total > 0 ? 
+                (boarData[boar].pregnant / boarData[boar].total * 100).toFixed(2) : 0;
+            
+            boarHTML += `
+                <tr>
+                    <td>${boar}</td>
+                    <td>${boarData[boar].total}</td>
+                    <td>${boarData[boar].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += boarData[boar].total;
+            pregnantAll += boarData[boar].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        boarHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        boarHTML += `</table>`;
+        
+        // 雄豚別の円グラフを追加
+        boarHTML += `<div class="chart-container" id="boar-chart-container"></div>`;
+        boarStats.innerHTML = boarHTML;
+        
+        // 雄豚別の円グラフを描画
+        createDataDistributionPieChart('boar-chart-container', '雄豚・精液別データ分布', boarData);
+    }
+    
+    // 円グラフ作成
+    function createPieChart(containerId, title, data, labels) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const canvas = document.createElement('canvas');
+        container.appendChild(canvas);
         
         // グラフ作成
         new Chart(canvas, {
@@ -414,29 +665,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 農場別の円グラフ作成
-    function createFarmPieChart(farmData) {
-        // グラフ用のコンテナ作成
-        const container = document.createElement('div');
-        container.className = 'chart-container';
-        container.id = 'farm-pie-chart-container';
+    // データ分布の円グラフ作成
+    function createDataDistributionPieChart(containerId, title, data) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = '';
         
         const canvas = document.createElement('canvas');
-        canvas.id = 'farm-pie-chart';
         container.appendChild(canvas);
         
-        // すでに存在する場合は削除
-        const existingContainer = document.getElementById(container.id);
-        if (existingContainer) {
-            existingContainer.remove();
-        }
-        
-        summaryStats.appendChild(container);
-        
         // データ準備
-        const labels = Object.keys(farmData);
-        const pregnantData = labels.map(farm => farmData[farm].pregnant);
-        const notPregnantData = labels.map(farm => farmData[farm].total - farmData[farm].pregnant);
+        const labels = Object.keys(data);
+        const values = labels.map(key => data[key].total);
         
         // 色の配列
         const backgroundColors = [
@@ -450,7 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: labels,
                 datasets: [{
-                    data: labels.map(farm => farmData[farm].total),
+                    data: values,
                     backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length])
                 }]
             },
@@ -458,23 +699,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 plugins: {
                     legend: {
-                        position: 'top',
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
                     },
                     title: {
                         display: true,
-                        text: '農場別データ分布',
+                        text: title,
                         font: {
-                            size: 16
+                            size: 16,
+                            weight: 'bold'
                         }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                const farm = context.label;
-                                const total = farmData[farm].total;
-                                const pregnant = farmData[farm].pregnant;
+                                const key = context.label;
+                                const total = data[key].total;
+                                const pregnant = data[key].pregnant;
                                 const rate = (pregnant / total * 100).toFixed(2);
-                                return `${farm}: ${pregnant}/${total} (${rate}%)`;
+                                return `${key}: ${pregnant}/${total} (${rate}%)`;
                             }
                         }
                     }
@@ -482,94 +729,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
+    
     // 詳細分析実行
     analyzeBtn.addEventListener('click', function() {
-        // フィルター適用
-        applyFilters();
-        
         const analysisType = document.getElementById('analysis-type').value;
         
-        // フィルターの状態を表示する文字列を作成
-        let filterDescription = '条件: ';
-        const filterStates = [];
-        
-        if (farmFilter.value !== 'all') filterStates.push(`農場=${farmFilter.value}`);
-        if (buildingFilter.value !== 'all') filterStates.push(`豚舎=${buildingFilter.value}`);
-        if (monthFilter.value !== 'all') filterStates.push(`${monthFilter.value}月`);
-        if (weekFilter.value !== 'all') {
-            const weekOption = weekFilter.options[weekFilter.selectedIndex];
-            filterStates.push(weekOption.textContent);
-        }
-        if (parityFilter.value !== 'all') filterStates.push(`産次=${parityFilter.value}`);
-        if (boarFilter.value !== 'all') filterStates.push(`雄豚=${boarFilter.value}`);
-        
-        filterDescription += filterStates.length > 0 ? filterStates.join(', ') : 'すべてのデータ';
-        
         switch(analysisType) {
-            case 'farm':
-                analyzeByFarm(filterDescription);
-                break;
-            case 'building':
-                analyzeByBuilding(filterDescription);
-                break;
             case 'month':
-                analyzeByMonth(filterDescription);
+                analyzeByMonth();
                 break;
             case 'week':
-                analyzeByWeek(filterDescription);
-                break;
-            case 'parity':
-                analyzeByParity(filterDescription);
-                break;
-            case 'boar':
-                analyzeByBoar(filterDescription);
+                analyzeByWeek();
                 break;
         }
     });
     
-    // 農場別分析
-    function analyzeByFarm(filterDescription) {
-        const farmData = {};
-        
-        filteredData.forEach(row => {
-            const farm = row['農場'] || '不明';
-            if (!farmData[farm]) {
-                farmData[farm] = { total: 0, pregnant: 0 };
-            }
-            
-            farmData[farm].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                farmData[farm].pregnant++;
-            }
-        });
-        
-        displayAnalysisResults(farmData, '農場別受胎率', filterDescription);
-    }
-    
-    // 豚舎別分析
-    function analyzeByBuilding(filterDescription) {
-        const buildingData = {};
-        
-        filteredData.forEach(row => {
-            const building = row['豚舎'] || '不明';
-            if (!buildingData[building]) {
-                buildingData[building] = { total: 0, pregnant: 0 };
-            }
-            
-            buildingData[building].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                buildingData[building].pregnant++;
-            }
-        });
-        
-        displayAnalysisResults(buildingData, '豚舎別受胎率', filterDescription);
-    }
-    
     // 月別分析
-    function analyzeByMonth(filterDescription) {
+    function analyzeByMonth() {
         const monthData = {};
         
         filteredData.forEach(row => {
@@ -596,11 +772,11 @@ document.addEventListener('DOMContentLoaded', function() {
             sortedMonthData[month + '月'] = monthData[month];
         });
         
-        displayAnalysisResults(sortedMonthData, '月別受胎率', filterDescription);
+        displayAdvancedResults(sortedMonthData, '月別受胎率');
     }
     
     // 週別分析
-    function analyzeByWeek(filterDescription) {
+    function analyzeByWeek() {
         const weekData = {};
         
         filteredData.forEach(row => {
@@ -643,71 +819,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             });
         
-        displayAnalysisResults(sortedWeekData, '週別受胎率', filterDescription);
+        displayAdvancedResults(sortedWeekData, '週別受胎率');
     }
     
-    // 産次別分析
-    function analyzeByParity(filterDescription) {
-        const parityData = {};
-        
-        filteredData.forEach(row => {
-            const parity = row['産次'] || '不明';
-            if (!parityData[parity]) {
-                parityData[parity] = { total: 0, pregnant: 0 };
-            }
-            
-            parityData[parity].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                parityData[parity].pregnant++;
-            }
-        });
-        
-        // 産次を数値順にソート（可能な場合）
-        const sortedParityData = {};
-        Object.keys(parityData)
-            .sort((a, b) => {
-                const numA = parseInt(a);
-                const numB = parseInt(b);
-                if (isNaN(numA) || isNaN(numB)) {
-                    return a.localeCompare(b); // 数値に変換できない場合は文字列比較
-                }
-                return numA - numB;
-            })
-            .forEach(parity => {
-                sortedParityData[parity] = parityData[parity];
-            });
-        
-        displayAnalysisResults(sortedParityData, '産次別受胎率', filterDescription);
-    }
-    
-    // 雄豚・精液別分析
-    function analyzeByBoar(filterDescription) {
-        const boarData = {};
-        
-        filteredData.forEach(row => {
-            const boar = row['雄豚・精液・あて雄'] || '不明';
-            if (!boarData[boar]) {
-                boarData[boar] = { total: 0, pregnant: 0 };
-            }
-            
-            boarData[boar].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                boarData[boar].pregnant++;
-            }
-        });
-        
-        displayAnalysisResults(boarData, '雄豚・精液別受胎率', filterDescription);
-    }
-    
-    // 分析結果表示
-    function displayAnalysisResults(data, title, filterDescription) {
+    // 詳細分析結果表示
+    function displayAdvancedResults(data, title) {
         // データがない場合
         if (Object.keys(data).length === 0) {
             advancedResults.innerHTML = `
                 <h3>${title}</h3>
-                <p class="filter-description">${filterDescription}</p>
                 <p class="no-data">データが見つかりませんでした。フィルター条件を変更してください。</p>
             `;
             return;
@@ -716,7 +836,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // テーブル作成
         let resultHTML = `
             <h3>${title}</h3>
-            <p class="filter-description">${filterDescription}</p>
             <table class="data-table">
                 <tr>
                     <th>区分</th>
@@ -743,74 +862,13 @@ document.addEventListener('DOMContentLoaded', function() {
         resultHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
         
         resultHTML += '</table>';
+        
+        // 円グラフ用のコンテナ
+        resultHTML += `<div class="chart-container" id="advanced-chart-container"></div>`;
+        
         advancedResults.innerHTML = resultHTML;
         
-        // グラフコンテナ作成
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-container';
-        advancedResults.appendChild(chartContainer);
-        
-        // 円グラフ用キャンバス
-        const pieCanvas = document.createElement('canvas');
-        pieCanvas.id = 'analysis-pie-chart';
-        chartContainer.appendChild(pieCanvas);
-        
-        // データ準備
-        const labels = Object.keys(data);
-        const values = labels.map(key => data[key].total);
-        
-        // 色の配列
-        const backgroundColors = [
-            'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
-            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
-            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
-            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
-            'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
-        ];
-        
-        // 円グラフ作成
-        new Chart(pieCanvas, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length])
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: `${title} - 頭数分布`,
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const key = context.label;
-                                const total = data[key].total;
-                                const pregnant = data[key].pregnant;
-                                const rate = (pregnant / total * 100).toFixed(2);
-                                return `${key}: ${pregnant}/${total} (${rate}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        // 円グラフを描画
+        createDataDistributionPieChart('advanced-chart-container', `${title} - データ分布`, data);
     }
 });
