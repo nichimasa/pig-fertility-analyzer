@@ -3,15 +3,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const encodingSelect = document.getElementById('encoding');
     const startAnalysisBtn = document.getElementById('start-analysis-btn');
     const analyzeBtn = document.getElementById('analyze-btn');
+    const resetFilterBtn = document.getElementById('reset-filter-btn');
     const summaryStats = document.getElementById('summary-stats');
     const advancedResults = document.getElementById('advanced-results');
     const resultsSection = document.querySelector('.results-section');
     const advancedSection = document.querySelector('.advanced-analysis');
     const loadingIndicator = document.getElementById('loading-indicator');
     
+    // フィルター要素
+    const farmFilter = document.getElementById('farm-filter');
+    const buildingFilter = document.getElementById('building-filter');
+    const monthFilter = document.getElementById('month-filter');
+    const weekFilter = document.getElementById('week-filter');
+    const parityFilter = document.getElementById('parity-filter');
+    const boarFilter = document.getElementById('boar-filter');
+    
     let selectedFile = null;
     let pigData = [];
+    let filteredData = [];
     let farmList = []; // 農場リスト
+    let buildingList = []; // 豚舎リスト
+    let parityList = []; // 産次リスト
+    let boarList = []; // 雄豚リスト
+    let weekList = []; // 週リスト
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
@@ -55,9 +69,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 complete: function(results) {
                     console.log("Parsed data:", results);
                     pigData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
+                    filteredData = [...pigData]; // 初期状態ではフィルターなし
                     
-                    // 農場リストを抽出
+                    // 各種リストを抽出
                     farmList = [...new Set(pigData.map(row => row['農場'] || '不明'))].filter(farm => farm);
+                    buildingList = [...new Set(pigData.map(row => row['豚舎'] || '不明'))].filter(building => building);
+                    parityList = [...new Set(pigData.map(row => row['産次'] || '不明'))].filter(parity => parity);
+                    boarList = [...new Set(pigData.map(row => row['雄豚・精液・あて雄'] || '不明'))].filter(boar => boar);
+                    
+                    // 週リストを作成
+                    const weekData = {};
+                    pigData.forEach(row => {
+                        if (row['種付日']) {
+                            const date = new Date(row['種付日']);
+                            if (!isNaN(date.getTime())) {
+                                const weekInfo = getWeekInfo(date);
+                                const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                                if (!weekData[weekKey]) {
+                                    weekData[weekKey] = {
+                                        year: weekInfo.year,
+                                        week: weekInfo.week,
+                                        start: weekInfo.start,
+                                        end: weekInfo.end
+                                    };
+                                }
+                            }
+                        }
+                    });
+                    
+                    // 週リストをソート
+                    weekList = Object.values(weekData).sort((a, b) => {
+                        if (a.year !== b.year) return a.year - b.year;
+                        return a.week - b.week;
+                    });
+                    
+                    // フィルターオプションを設定
+                    populateFilterOptions();
                     
                     // 読み込み完了、分析結果表示
                     loadingIndicator.style.display = 'none';
@@ -72,6 +119,178 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }, 500); // 少し遅延させてUIの反応を良くする
+    });
+    
+    // フィルターオプションを設定
+    function populateFilterOptions() {
+        // 農場フィルター
+        farmFilter.innerHTML = '<option value="all">すべて</option>';
+        farmList.forEach(farm => {
+            const option = document.createElement('option');
+            option.value = farm;
+            option.textContent = farm;
+            farmFilter.appendChild(option);
+        });
+        
+        // 豚舎フィルター
+        buildingFilter.innerHTML = '<option value="all">すべて</option>';
+        buildingList.forEach(building => {
+            const option = document.createElement('option');
+            option.value = building;
+            option.textContent = building;
+            buildingFilter.appendChild(option);
+        });
+        
+        // 産次フィルター
+        parityFilter.innerHTML = '<option value="all">すべて</option>';
+        parityList.forEach(parity => {
+            const option = document.createElement('option');
+            option.value = parity;
+            option.textContent = parity;
+            parityFilter.appendChild(option);
+        });
+        
+        // 雄豚フィルター
+        boarFilter.innerHTML = '<option value="all">すべて</option>';
+        boarList.forEach(boar => {
+            const option = document.createElement('option');
+            option.value = boar;
+            option.textContent = boar;
+            boarFilter.appendChild(option);
+        });
+        
+        // 週フィルター
+        weekFilter.innerHTML = '<option value="all">すべて</option>';
+        weekList.forEach(weekInfo => {
+            const startDate = formatDate(weekInfo.start);
+            const endDate = formatDate(weekInfo.end);
+            const option = document.createElement('option');
+            option.value = `${weekInfo.year}-W${weekInfo.week}`;
+            option.textContent = `${weekInfo.year}年 第${weekInfo.week}週 (${startDate}～${endDate})`;
+            weekFilter.appendChild(option);
+        });
+    }
+    
+    // 日付のフォーマット
+    function formatDate(date) {
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `${month}/${day}`;
+    }
+    
+    // 日付から週情報を取得
+    function getWeekInfo(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        
+        // 日付をその週の月曜日に調整
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 日曜日の場合は前の週の月曜日
+        const monday = new Date(d.setDate(diff));
+        
+        // 週の日曜日
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        // 年と週番号を取得
+        const firstDayOfYear = new Date(monday.getFullYear(), 0, 1);
+        const pastDaysOfYear = (monday - firstDayOfYear) / 86400000;
+        const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        
+        return {
+            year: monday.getFullYear(),
+            week: weekNumber,
+            start: new Date(monday),
+            end: new Date(sunday)
+        };
+    }
+    
+    // フィルターリセットボタン
+    resetFilterBtn.addEventListener('click', function() {
+        farmFilter.value = 'all';
+        buildingFilter.value = 'all';
+        monthFilter.value = 'all';
+        weekFilter.value = 'all';
+        parityFilter.value = 'all';
+        boarFilter.value = 'all';
+        
+        filteredData = [...pigData];
+        updateFilteredDataCount();
+    });
+    
+    // フィルター適用関数
+    function applyFilters() {
+        filteredData = pigData.filter(row => {
+            // 農場フィルター
+            if (farmFilter.value !== 'all' && row['農場'] !== farmFilter.value) {
+                return false;
+            }
+            
+            // 豚舎フィルター
+            if (buildingFilter.value !== 'all' && row['豚舎'] !== buildingFilter.value) {
+                return false;
+            }
+            
+            // 産次フィルター
+            if (parityFilter.value !== 'all' && row['産次'] !== parityFilter.value) {
+                return false;
+            }
+            
+            // 雄豚フィルター
+            if (boarFilter.value !== 'all' && row['雄豚・精液・あて雄'] !== boarFilter.value) {
+                return false;
+            }
+            
+            // 月フィルター
+            if (monthFilter.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const month = date.getMonth() + 1;
+                    if (parseInt(monthFilter.value) !== month) {
+                        return false;
+                    }
+                }
+            }
+            
+            // 週フィルター
+            if (weekFilter.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    if (weekFilter.value !== weekKey) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        });
+        
+        updateFilteredDataCount();
+        return filteredData;
+    }
+    
+    // フィルター適用後のデータ数を表示
+    function updateFilteredDataCount() {
+        const filterCountElem = document.querySelector('.filtered-count');
+        if (filterCountElem) {
+            filterCountElem.remove();
+        }
+        
+        const countInfo = document.createElement('div');
+        countInfo.className = 'filtered-count';
+        countInfo.textContent = `現在のフィルター条件: ${filteredData.length}件 / 全${pigData.length}件`;
+        
+        const filterSection = document.querySelector('.filter-section');
+        filterSection.appendChild(countInfo);
+    }
+    
+    // フィルター変更イベント
+    [farmFilter, buildingFilter, monthFilter, weekFilter, parityFilter, boarFilter].forEach(filter => {
+        filter.addEventListener('change', function() {
+            applyFilters();
+        });
     });
     
     // 全体および農場別の受胎率計算
@@ -266,32 +485,54 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 詳細分析実行
     analyzeBtn.addEventListener('click', function() {
+        // フィルター適用
+        applyFilters();
+        
         const analysisType = document.getElementById('analysis-type').value;
+        
+        // フィルターの状態を表示する文字列を作成
+        let filterDescription = '条件: ';
+        const filterStates = [];
+        
+        if (farmFilter.value !== 'all') filterStates.push(`農場=${farmFilter.value}`);
+        if (buildingFilter.value !== 'all') filterStates.push(`豚舎=${buildingFilter.value}`);
+        if (monthFilter.value !== 'all') filterStates.push(`${monthFilter.value}月`);
+        if (weekFilter.value !== 'all') {
+            const weekOption = weekFilter.options[weekFilter.selectedIndex];
+            filterStates.push(weekOption.textContent);
+        }
+        if (parityFilter.value !== 'all') filterStates.push(`産次=${parityFilter.value}`);
+        if (boarFilter.value !== 'all') filterStates.push(`雄豚=${boarFilter.value}`);
+        
+        filterDescription += filterStates.length > 0 ? filterStates.join(', ') : 'すべてのデータ';
         
         switch(analysisType) {
             case 'farm':
-                analyzeByFarm();
+                analyzeByFarm(filterDescription);
                 break;
             case 'building':
-                analyzeByBuilding();
+                analyzeByBuilding(filterDescription);
                 break;
             case 'month':
-                analyzeByMonth();
+                analyzeByMonth(filterDescription);
+                break;
+            case 'week':
+                analyzeByWeek(filterDescription);
                 break;
             case 'parity':
-                analyzeByParity();
+                analyzeByParity(filterDescription);
                 break;
             case 'boar':
-                analyzeByBoar();
+                analyzeByBoar(filterDescription);
                 break;
         }
     });
     
     // 農場別分析
-    function analyzeByFarm() {
+    function analyzeByFarm(filterDescription) {
         const farmData = {};
         
-        pigData.forEach(row => {
+        filteredData.forEach(row => {
             const farm = row['農場'] || '不明';
             if (!farmData[farm]) {
                 farmData[farm] = { total: 0, pregnant: 0 };
@@ -304,309 +545,66 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        displayAnalysisResults(farmData, '農場別受胎率');
+        displayAnalysisResults(farmData, '農場別受胎率', filterDescription);
     }
     
-    // 豚舎別分析（農場ごと）
-    function analyzeByBuilding() {
-        // 農場ごとの豚舎データ
-        const farmBuildingData = {};
+    // 豚舎別分析
+    function analyzeByBuilding(filterDescription) {
+        const buildingData = {};
         
-        // まず農場ごとにグループ化
-        farmList.forEach(farm => {
-            const farmPigs = pigData.filter(row => (row['農場'] || '不明') === farm);
-            const buildingData = {};
+        filteredData.forEach(row => {
+            const building = row['豚舎'] || '不明';
+            if (!buildingData[building]) {
+                buildingData[building] = { total: 0, pregnant: 0 };
+            }
             
-            farmPigs.forEach(row => {
-                const building = row['豚舎'] || '不明';
-                if (!buildingData[building]) {
-                    buildingData[building] = { total: 0, pregnant: 0 };
-                }
-                
-                buildingData[building].total++;
-                const result = (row['妊娠鑑定結果'] || '').trim();
-                if (result === '受胎確定') {
-                    buildingData[building].pregnant++;
-                }
-            });
-            
-            farmBuildingData[farm] = buildingData;
+            buildingData[building].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                buildingData[building].pregnant++;
+            }
         });
         
-        displayFarmAnalysisResults(farmBuildingData, '豚舎別受胎率（農場ごと）');
+        displayAnalysisResults(buildingData, '豚舎別受胎率', filterDescription);
     }
     
-    // 月別分析（農場ごと）
-    function analyzeByMonth() {
-        // 農場ごとの月別データ
-        const farmMonthData = {};
+    // 月別分析
+    function analyzeByMonth(filterDescription) {
+        const monthData = {};
         
-        // まず農場ごとにグループ化
-        farmList.forEach(farm => {
-            const farmPigs = pigData.filter(row => (row['農場'] || '不明') === farm);
-            const monthData = {};
-            
-            farmPigs.forEach(row => {
-                if (row['種付日']) {
-                    const date = new Date(row['種付日']);
-                    if (!isNaN(date.getTime())) {
-                        const month = date.getMonth() + 1;
-                        if (!monthData[month]) {
-                            monthData[month] = { total: 0, pregnant: 0 };
-                        }
-                        
-                        monthData[month].total++;
-                        const result = (row['妊娠鑑定結果'] || '').trim();
-                        if (result === '受胎確定') {
-                            monthData[month].pregnant++;
-                        }
+        filteredData.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const month = date.getMonth() + 1;
+                    if (!monthData[month]) {
+                        monthData[month] = { total: 0, pregnant: 0 };
                     }
-                }
-            });
-            
-            farmMonthData[farm] = monthData;
-        });
-        
-        displayFarmAnalysisResults(farmMonthData, '月別受胎率（農場ごと）');
-    }
-    
-    // 産次別分析（農場ごと）
-    function analyzeByParity() {
-        // 農場ごとの産次データ
-        const farmParityData = {};
-        
-        // まず農場ごとにグループ化
-        farmList.forEach(farm => {
-            const farmPigs = pigData.filter(row => (row['農場'] || '不明') === farm);
-            const parityData = {};
-            
-            farmPigs.forEach(row => {
-                const parity = row['産次'] || '不明';
-                if (!parityData[parity]) {
-                    parityData[parity] = { total: 0, pregnant: 0 };
-                }
-                
-                parityData[parity].total++;
-                const result = (row['妊娠鑑定結果'] || '').trim();
-                if (result === '受胎確定') {
-                    parityData[parity].pregnant++;
-                }
-            });
-            
-            farmParityData[farm] = parityData;
-        });
-        
-        displayFarmAnalysisResults(farmParityData, '産次別受胎率（農場ごと）');
-    }
-    
-    // 雄豚・精液別分析（農場ごと）
-    function analyzeByBoar() {
-        // 農場ごとの雄豚データ
-        const farmBoarData = {};
-        
-        // まず農場ごとにグループ化
-        farmList.forEach(farm => {
-            const farmPigs = pigData.filter(row => (row['農場'] || '不明') === farm);
-            const boarData = {};
-            
-            farmPigs.forEach(row => {
-                const boar = row['雄豚・精液・あて雄'] || '不明';
-                if (!boarData[boar]) {
-                    boarData[boar] = { total: 0, pregnant: 0 };
-                }
-                
-                boarData[boar].total++;
-                const result = (row['妊娠鑑定結果'] || '').trim();
-                if (result === '受胎確定') {
-                    boarData[boar].pregnant++;
-                }
-            });
-            
-            farmBoarData[farm] = boarData;
-        });
-        
-        displayFarmAnalysisResults(farmBoarData, '雄豚・精液別受胎率（農場ごと）');
-    }
-    
-    // 単純な分析結果表示（農場別など単一カテゴリ）
-    function displayAnalysisResults(data, title) {
-        // テーブル作成
-        let resultHTML = `<h3>${title}</h3><table class="data-table"><tr><th>区分</th><th>総数</th><th>受胎数</th><th>受胎率</th></tr>`;
-        
-        for (const key in data) {
-            const rate = data[key].total > 0 ? (data[key].pregnant / data[key].total * 100).toFixed(2) : 0;
-            resultHTML += `<tr><td>${key}</td><td>${data[key].total}</td><td>${data[key].pregnant}</td><td>${rate}%</td></tr>`;
-        }
-        
-        resultHTML += '</table>';
-        advancedResults.innerHTML = resultHTML;
-        
-        // グラフコンテナ作成
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-container';
-        advancedResults.appendChild(chartContainer);
-        
-        // 円グラフ用キャンバス
-        const pieCanvas = document.createElement('canvas');
-        pieCanvas.id = 'analysis-pie-chart';
-        chartContainer.appendChild(pieCanvas);
-        
-        // データ準備
-        const labels = Object.keys(data);
-        const values = labels.map(key => data[key].total);
-        
-        // 色の配列
-        const backgroundColors = [
-            'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
-            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
-            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
-            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
-            'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
-        ];
-        
-        // 円グラフ作成
-        new Chart(pieCanvas, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length])
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: `${title} - 頭数分布`,
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const key = context.label;
-                                const total = data[key].total;
-                                const pregnant = data[key].pregnant;
-                                const rate = (pregnant / total * 100).toFixed(2);
-                                return `${key}: ${pregnant}/${total} (${rate}%)`;
-                            }
-                        }
+                    
+                    monthData[month].total++;
+                    const result = (row['妊娠鑑定結果'] || '').trim();
+                    if (result === '受胎確定') {
+                        monthData[month].pregnant++;
                     }
                 }
             }
         });
+        
+        // 月を数値順にソート
+        const sortedMonthData = {};
+        Object.keys(monthData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(month => {
+            sortedMonthData[month + '月'] = monthData[month];
+        });
+        
+        displayAnalysisResults(sortedMonthData, '月別受胎率', filterDescription);
     }
     
-    // 農場ごとの詳細分析結果表示
-    function displayFarmAnalysisResults(farmData, title) {
-        let resultHTML = `<h3>${title}</h3>`;
+    // 週別分析
+    function analyzeByWeek(filterDescription) {
+        const weekData = {};
         
-        // 各農場ごとにテーブルとグラフを作成
-        for (const farm in farmData) {
-            resultHTML += `<h4 class="farm-title">農場: ${farm}</h4>`;
-            resultHTML += `<table class="data-table">
-                <tr>
-                    <th>区分</th>
-                    <th>総数</th>
-                    <th>受胎数</th>
-                    <th>受胎率</th>
-                </tr>`;
-            
-            const data = farmData[farm];
-            for (const key in data) {
-                const rate = data[key].total > 0 ? (data[key].pregnant / data[key].total * 100).toFixed(2) : 0;
-                resultHTML += `<tr><td>${key}</td><td>${data[key].total}</td><td>${data[key].pregnant}</td><td>${rate}%</td></tr>`;
-            }
-            
-            resultHTML += `</table>`;
-        }
-        
-        advancedResults.innerHTML = resultHTML;
-        
-        // 各農場ごとにグラフを作成
-        for (const farm in farmData) {
-            const data = farmData[farm];
-            
-            // グラフコンテナ作成
-            const farmChartContainer = document.createElement('div');
-            farmChartContainer.className = 'farm-chart-container';
-            farmChartContainer.innerHTML = `<h4 class="chart-title">農場: ${farm} - グラフ</h4>`;
-            advancedResults.appendChild(farmChartContainer);
-            
-            // 円グラフ用キャンバス
-            const pieCanvas = document.createElement('canvas');
-            pieCanvas.id = `farm-${farm}-pie-chart`.replace(/\s+/g, '-');
-            farmChartContainer.appendChild(pieCanvas);
-            
-            // データ準備
-            const labels = Object.keys(data);
-            const values = labels.map(key => data[key].total);
-            
-            // 色の配列
-            const backgroundColors = [
-                'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
-                'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
-                'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
-                'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
-                'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
-            ];
-            
-            // 円グラフ作成
-            new Chart(pieCanvas, {
-                type: 'pie',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length])
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                font: {
-                                    size: 14
-                                }
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: `${farm} - 頭数分布`,
-                            font: {
-                                size: 16,
-                                weight: 'bold'
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const key = context.label;
-                                    const total = data[key].total;
-                                    const pregnant = data[key].pregnant;
-                                    const rate = (pregnant / total * 100).toFixed(2);
-                                    return `${key}: ${pregnant}/${total} (${rate}%)`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
-});
+        filteredData.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo
