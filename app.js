@@ -27,8 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return numA - numB;
     }
     
-    const fileInput = document.getElementById('csvFile');
-    
+    // DOM要素の参照を取得
     const fileInput = document.getElementById('csvFile');
     const encodingSelect = document.getElementById('encoding');
     const startAnalysisBtn = document.getElementById('start-analysis-btn');
@@ -91,28 +90,45 @@ document.addEventListener('DOMContentLoaded', function() {
     let farm2BoarList = [];
     let farm2WeekList = [];
     
-    // ファイル選択時の処理
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            selectedFile = e.target.files[0];
-            startAnalysisBtn.disabled = false;
-            // ファイル名を表示
-            const fileName = document.createElement('p');
-            fileName.textContent = `選択されたファイル: ${selectedFile.name}`;
-            fileName.className = 'selected-file';
+ // ファイル選択イベントの修正版
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            console.log("File selected:", e.target.files);
             
-            // 既存のファイル名表示を削除
-            const existingFileName = document.querySelector('.selected-file');
-            if (existingFileName) {
-                existingFileName.remove();
+            if (e.target.files && e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                console.log("Selected file:", selectedFile.name);
+                
+                // 分析開始ボタンを有効化（setTimeout で少し遅延させて確実に実行）
+                setTimeout(function() {
+                    if (startAnalysisBtn) {
+                        startAnalysisBtn.disabled = false;
+                        console.log("Start button enabled");
+                    }
+                }, 100);
+                
+                // ファイル名を表示
+                const fileName = document.createElement('p');
+                fileName.textContent = `選択されたファイル: ${selectedFile.name}`;
+                fileName.className = 'selected-file';
+                
+                // 既存のファイル名表示を削除
+                const existingFileName = document.querySelector('.selected-file');
+                if (existingFileName) {
+                    existingFileName.remove();
+                }
+                
+                if (fileInput.parentNode) {
+                    fileInput.parentNode.insertBefore(fileName, startAnalysisBtn);
+                }
+            } else {
+                selectedFile = null;
+                if (startAnalysisBtn) {
+                    startAnalysisBtn.disabled = true;
+                }
             }
-            
-            fileInput.parentNode.insertBefore(fileName, startAnalysisBtn);
-        } else {
-            selectedFile = null;
-            startAnalysisBtn.disabled = true;
-        }
-    });
+        });
+    }
     
     // 分析開始ボタンクリック時の処理
     startAnalysisBtn.addEventListener('click', function() {
