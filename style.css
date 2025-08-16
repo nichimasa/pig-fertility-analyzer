@@ -8,7 +8,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -25,19 +25,19 @@ h2 {
     color: #2980b9;
     border-left: 4px solid #3498db;
     padding-left: 10px;
-    margin-top: 30px;
-    margin-bottom: 20px;
+    margin-top: 20px;
+    margin-bottom: 15px;
 }
 
 h3 {
     color: #3498db;
-    margin-top: 25px;
-    margin-bottom: 15px;
+    margin-top: 15px;
+    margin-bottom: 10px;
     border-bottom: 1px solid #eee;
     padding-bottom: 5px;
 }
 
-.upload-section, .results-section, .advanced-analysis, .filter-section {
+.upload-section {
     background: white;
     border-radius: 8px;
     padding: 25px;
@@ -49,152 +49,71 @@ h3 {
     margin-top: 10px;
 }
 
-.stat-card {
-    text-align: center;
-    padding: 25px;
+/* 左右分割レイアウト */
+.analysis-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.farm-analysis {
+    flex: 1;
+    min-width: 45%;
+    background: white;
     border-radius: 8px;
-    background: #e9f7ef;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-    max-width: 300px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.rate {
-    font-size: 3em;
-    font-weight: bold;
-    color: #27ae60;
-    margin: 10px 0;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.1);
-    font-size: 1.1em;
-}
-
-.data-table th, .data-table td {
-    padding: 15px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-.data-table th {
-    background-color: #f2f2f2;
-    font-weight: bold;
-    color: #2c3e50;
-    font-size: 1.2em;
-}
-
-.data-table tr:hover {
-    background-color: #f5f5f5;
-}
-
-.data-table .total-row {
-    font-weight: bold;
-    background-color: #e8f4f8;
-}
-
-.chart-container {
-    width: 700px;
-    height: 400px;
-    margin: 30px auto;
-}
-
-select, button, input[type="file"] {
-    padding: 10px;
-    margin: 10px 5px 10px 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-button {
-    background-color: #3498db;
-    color: white;
-
-body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    line-height: 1.6;
-    margin: 0;
-    padding: 0;
-    background-color: #f8f9fa;
-    color: #333;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
     padding: 20px;
-}
-
-h1 {
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 30px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #3498db;
-}
-
-h2 {
-    color: #2980b9;
-    border-left: 4px solid #3498db;
-    padding-left: 10px;
-    margin-top: 30px;
-    margin-bottom: 20px;
-}
-
-h3 {
-    color: #3498db;
-    margin-top: 25px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-}
-
-.upload-section, .results-section, .advanced-analysis, .filter-section {
-    background: white;
-    border-radius: 8px;
-    padding: 25px;
-    margin-bottom: 30px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-.encoding-selector {
-    margin-top: 10px;
+.farm-1 h2 {
+    border-left-color: #2ecc71; /* 緑 */
+}
+
+.farm-2 h2 {
+    border-left-color: #e74c3c; /* 赤 */
 }
 
 .stat-card {
     text-align: center;
-    padding: 25px;
+    padding: 20px;
     border-radius: 8px;
     background: #e9f7ef;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 20px;
-    max-width: 300px;
-    margin-left: auto;
-    margin-right: auto;
+}
+
+.farm-1 .stat-card {
+    background: #e8f8f5; /* 緑っぽい */
+}
+
+.farm-2 .stat-card {
+    background: #fef5f3; /* 赤っぽい */
 }
 
 .rate {
-    font-size: 3em;
+    font-size: 2.5em;
     font-weight: bold;
-    color: #27ae60;
     margin: 10px 0;
+}
+
+.farm-1 .rate {
+    color: #27ae60; /* 緑 */
+}
+
+.farm-2 .rate {
+    color: #c0392b; /* 赤 */
 }
 
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
+    margin: 15px 0;
     box-shadow: 0 2px 3px rgba(0,0,0,0.1);
-    font-size: 1.1em;
+    font-size: 1em;
 }
 
 .data-table th, .data-table td {
-    padding: 15px;
+    padding: 10px;
     text-align: left;
     border-bottom: 1px solid #ddd;
 }
@@ -203,7 +122,6 @@ h3 {
     background-color: #f2f2f2;
     font-weight: bold;
     color: #2c3e50;
-    font-size: 1.2em;
 }
 
 .data-table tr:hover {
@@ -216,14 +134,14 @@ h3 {
 }
 
 .chart-container {
-    width: 700px;
-    height: 400px;
-    margin: 30px auto;
+    width: 100%;
+    height: 300px;
+    margin: 20px auto;
 }
 
 select, button, input[type="file"] {
-    padding: 10px;
-    margin: 10px 5px 10px 0;
+    padding: 8px;
+    margin: 5px 5px 5px 0;
     border: 1px solid #ddd;
     border-radius: 4px;
 }
@@ -232,7 +150,7 @@ button {
     background-color: #3498db;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 8px 15px;
     cursor: pointer;
     transition: background-color 0.3s;
 }
@@ -297,102 +215,104 @@ button:hover {
 .filter-row {
     display: flex;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .filter-item {
-    margin-right: 15px;
-    margin-bottom: 10px;
-    min-width: 180px;
+    margin-right: 10px;
+    margin-bottom: 8px;
+    flex: 1;
+    min-width: 120px;
 }
 
 .filter-item label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
     font-weight: bold;
+    font-size: 0.9em;
 }
 
 .filter-actions {
     display: flex;
     align-items: flex-end;
-    margin-bottom: 10px;
+    width: 100%;
+    justify-content: space-between;
 }
 
-#reset-filter-btn {
+#reset-filter-btn-1, #reset-filter-btn-2 {
     background-color: #6c757d;
-    margin-right: 10px;
 }
 
-#reset-filter-btn:hover {
+#reset-filter-btn-1:hover, #reset-filter-btn-2:hover {
     background-color: #5a6268;
 }
 
-#apply-filter-btn {
-    background-color: #28a745;
+#apply-filter-btn-1 {
+    background-color: #27ae60; /* 緑 */
 }
 
-#apply-filter-btn:hover {
-    background-color: #218838;
+#apply-filter-btn-1:hover {
+    background-color: #219a52;
 }
 
-.analysis-type-section {
-    display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-    background-color: #e9f7ef;
-    padding: 15px;
-    border-radius: 8px;
+#apply-filter-btn-2 {
+    background-color: #c0392b; /* 赤 */
 }
 
-.analysis-type-section label {
-    margin-right: 10px;
-    font-weight: bold;
-}
-
-.analysis-type-section select {
-    flex-grow: 1;
-    max-width: 300px;
-    margin-right: 15px;
+#apply-filter-btn-2:hover {
+    background-color: #a63326;
 }
 
 .filter-description {
     background-color: #e9f7ef;
-    padding: 10px;
+    padding: 8px;
     border-radius: 5px;
-    margin: 15px 0;
+    margin: 10px 0;
     font-style: italic;
+    font-size: 0.9em;
+}
+
+.farm-1 .filter-description {
+    background-color: #e8f8f5;
+}
+
+.farm-2 .filter-description {
+    background-color: #fef5f3;
 }
 
 .no-data {
     text-align: center;
-    padding: 30px;
+    padding: 20px;
     background-color: #f8d7da;
     color: #721c24;
     border-radius: 5px;
-    font-size: 1.1em;
+    font-size: 1em;
 }
 
 /* 結果セクション */
-#overall-stats, #farm-stats, #building-stats, #parity-stats, #boar-stats {
-    margin-bottom: 40px;
-    padding-bottom: 20px;
+.results-section {
+    padding: 10px;
+}
+
+#overall-stats-1, #building-stats-1, #parity-stats-1, #boar-stats-1,
+#overall-stats-2, #building-stats-2, #parity-stats-2, #boar-stats-2 {
+    margin-bottom: 30px;
+    padding-bottom: 15px;
     border-bottom: 1px solid #eee;
 }
 
 /* レスポンシブ対応 */
-@media (max-width: 992px) {
-    .chart-container {
-        width: 95%;
+@media (max-width: 1200px) {
+    .analysis-container {
+        flex-direction: column;
     }
     
-    .filter-item {
-        min-width: 45%;
-    }
-    
-    .filter-actions {
+    .farm-analysis {
         width: 100%;
-        justify-content: space-between;
-        margin-top: 10px;
+    }
+    
+    .chart-container {
+        height: 250px;
     }
 }
 
@@ -406,6 +326,7 @@ button:hover {
     }
     
     .data-table th, .data-table td {
-        padding: 10px;
+        padding: 8px;
+        font-size: 0.9em;
     }
 }
