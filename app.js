@@ -170,8 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
             weekFilter.appendChild(option);
         });
     }
-    
-    // 日付のフォーマット
+
+        // 日付のフォーマット
     function formatDate(date) {
         const month = date.getMonth() + 1;
         const day = date.getDate();
@@ -482,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     // 詳細分析実行
     analyzeBtn.addEventListener('click', function() {
         // フィルター適用
@@ -607,4 +607,210 @@ document.addEventListener('DOMContentLoaded', function() {
             if (row['種付日']) {
                 const date = new Date(row['種付日']);
                 if (!isNaN(date.getTime())) {
-                    const weekInfo
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    const displayKey = `${weekInfo.year}年第${weekInfo.week}週`;
+                    
+                    if (!weekData[displayKey]) {
+                        weekData[displayKey] = { 
+                            total: 0, 
+                            pregnant: 0,
+                            start: weekInfo.start,
+                            end: weekInfo.end,
+                            sortKey: weekKey
+                        };
+                    }
+                    
+                    weekData[displayKey].total++;
+                    const result = (row['妊娠鑑定結果'] || '').trim();
+                    if (result === '受胎確定') {
+                        weekData[displayKey].pregnant++;
+                    }
+                }
+            }
+        });
+        
+        // 週を時系列順にソート
+        const sortedWeekData = {};
+        Object.entries(weekData)
+            .sort((a, b) => a[1].sortKey.localeCompare(b[1].sortKey))
+            .forEach(([key, value]) => {
+                const startDate = formatDate(value.start);
+                const endDate = formatDate(value.end);
+                sortedWeekData[`${key}(${startDate}～${endDate})`] = {
+                    total: value.total,
+                    pregnant: value.pregnant
+                };
+            });
+        
+        displayAnalysisResults(sortedWeekData, '週別受胎率', filterDescription);
+    }
+    
+    // 産次別分析
+    function analyzeByParity(filterDescription) {
+        const parityData = {};
+        
+        filteredData.forEach(row => {
+            const parity = row['産次'] || '不明';
+            if (!parityData[parity]) {
+                parityData[parity] = { total: 0, pregnant: 0 };
+            }
+            
+            parityData[parity].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                parityData[parity].pregnant++;
+            }
+        });
+        
+        // 産次を数値順にソート（可能な場合）
+        const sortedParityData = {};
+        Object.keys(parityData)
+            .sort((a, b) => {
+                const numA = parseInt(a);
+                const numB = parseInt(b);
+                if (isNaN(numA) || isNaN(numB)) {
+                    return a.localeCompare(b); // 数値に変換できない場合は文字列比較
+                }
+                return numA - numB;
+            })
+            .forEach(parity => {
+                sortedParityData[parity] = parityData[parity];
+            });
+        
+        displayAnalysisResults(sortedParityData, '産次別受胎率', filterDescription);
+    }
+    
+    // 雄豚・精液別分析
+    function analyzeByBoar(filterDescription) {
+        const boarData = {};
+        
+        filteredData.forEach(row => {
+            const boar = row['雄豚・精液・あて雄'] || '不明';
+            if (!boarData[boar]) {
+                boarData[boar] = { total: 0, pregnant: 0 };
+            }
+            
+            boarData[boar].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                boarData[boar].pregnant++;
+            }
+        });
+        
+        displayAnalysisResults(boarData, '雄豚・精液別受胎率', filterDescription);
+    }
+    
+    // 分析結果表示
+    function displayAnalysisResults(data, title, filterDescription) {
+        // データがない場合
+        if (Object.keys(data).length === 0) {
+            advancedResults.innerHTML = `
+                <h3>${title}</h3>
+                <p class="filter-description">${filterDescription}</p>
+                <p class="no-data">データが見つかりませんでした。フィルター条件を変更してください。</p>
+            `;
+            return;
+        }
+        
+        // テーブル作成
+        let resultHTML = `
+            <h3>${title}</h3>
+            <p class="filter-description">${filterDescription}</p>
+            <table class="data-table">
+                <tr>
+                    <th>区分</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
+        `;
+        
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const key in data) {
+            const rate = data[key].total > 0 ? (data[key].pregnant / data[key].total * 100).toFixed(2) : 0;
+            resultHTML += `<tr><td>${key}</td><td>${data[key].total}</td><td>${data[key].pregnant}</td><td>${rate}%</td></tr>`;
+            
+            totalAll += data[key].total;
+            pregnantAll += data[key].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        resultHTML += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        resultHTML += '</table>';
+        advancedResults.innerHTML = resultHTML;
+        
+        // グラフコンテナ作成
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'chart-container';
+        advancedResults.appendChild(chartContainer);
+        
+        // 円グラフ用キャンバス
+        const pieCanvas = document.createElement('canvas');
+        pieCanvas.id = 'analysis-pie-chart';
+        chartContainer.appendChild(pieCanvas);
+        
+        // データ準備
+        const labels = Object.keys(data);
+        const values = labels.map(key => data[key].total);
+        
+        // 色の配列
+        const backgroundColors = [
+            'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
+            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
+            'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
+        ];
+        
+        // 円グラフ作成
+        new Chart(pieCanvas, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length])
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `${title} - 頭数分布`,
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const key = context.label;
+                                const total = data[key].total;
+                                const pregnant = data[key].pregnant;
+                                const rate = (pregnant / total * 100).toFixed(2);
+                                return `${key}: ${pregnant}/${total} (${rate}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
