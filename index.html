@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>豚受胎率分析ツール</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>豚受胎率分析ツール</h1>
+        
+        <div class="upload-section">
+            <h2>CSVファイルをアップロード</h2>
+            <input type="file" id="csvFile" accept=".csv">
+            <div class="encoding-selector">
+                <label for="encoding">文字コード:</label>
+                <select id="encoding">
+                    <option value="Shift_JIS">Shift-JIS</option>
+                    <option value="UTF-8">UTF-8</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="results-section" style="display:none">
+            <h2>基本分析結果</h2>
+            <div id="summary-stats"></div>
+            <div id="charts"></div>
+        </div>
+        
+        <div class="advanced-analysis" style="display:none">
+            <h2>詳細分析</h2>
+            <select id="analysis-type">
+                <option value="farm">農場別の受胎率</option>
+                <option value="building">豚舎別の受胎率</option>
+                <option value="month">月別の受胎率</option>
+                <option value="parity">産次別の受胎率</option>
+                <option value="boar">雄豚・精液別の受胎率</option>
+            </select>
+            <button id="analyze-btn">分析実行</button>
+            <div id="advanced-results"></div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
