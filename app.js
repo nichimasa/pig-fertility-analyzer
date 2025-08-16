@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="farm-summary">
                 <h3>農場別受胎率</h3>
-                <table>
+                <table class="data-table">
                     <tr>
                         <th>農場</th>
                         <th>総数</th>
@@ -185,7 +185,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: title
+                        text: title,
+                        font: {
+                            size: 16
+                        }
                     }
                 }
             }
@@ -240,7 +243,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: '農場別データ分布'
+                        text: '農場別データ分布',
+                        font: {
+                            size: 16
+                        }
                     },
                     tooltip: {
                         callbacks: {
@@ -425,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 単純な分析結果表示（農場別など単一カテゴリ）
     function displayAnalysisResults(data, title) {
         // テーブル作成
-        let resultHTML = `<h3>${title}</h3><table><tr><th>区分</th><th>総数</th><th>受胎数</th><th>受胎率</th></tr>`;
+        let resultHTML = `<h3>${title}</h3><table class="data-table"><tr><th>区分</th><th>総数</th><th>受胎数</th><th>受胎率</th></tr>`;
         
         for (const key in data) {
             const rate = data[key].total > 0 ? (data[key].pregnant / data[key].total * 100).toFixed(2) : 0;
@@ -437,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // グラフコンテナ作成
         const chartContainer = document.createElement('div');
-        chartContainer.className = 'charts-container';
+        chartContainer.className = 'chart-container';
         advancedResults.appendChild(chartContainer);
         
         // 円グラフ用キャンバス
@@ -445,26 +451,17 @@ document.addEventListener('DOMContentLoaded', function() {
         pieCanvas.id = 'analysis-pie-chart';
         chartContainer.appendChild(pieCanvas);
         
-        // 棒グラフ用キャンバス
-        const barCanvas = document.createElement('canvas');
-        barCanvas.id = 'analysis-bar-chart';
-        chartContainer.appendChild(barCanvas);
-        
         // データ準備
         const labels = Object.keys(data);
         const values = labels.map(key => data[key].total);
-        const pregnantValues = labels.map(key => data[key].pregnant);
-        const rates = labels.map(key => 
-            data[key].total > 0 ? (data[key].pregnant / data[key].total * 100) : 0
-        );
         
         // 色の配列
         const backgroundColors = [
-            'rgba(54, 162, 235, 0.5)', 'rgba(255, 99, 132, 0.5)', 
-            'rgba(255, 206, 86, 0.5)', 'rgba(75, 192, 192, 0.5)',
-            'rgba(153, 102, 255, 0.5)', 'rgba(255, 159, 64, 0.5)',
-            'rgba(199, 199, 199, 0.5)', 'rgba(83, 102, 255, 0.5)', 
-            'rgba(40, 159, 64, 0.5)', 'rgba(210, 199, 199, 0.5)'
+            'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
+            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
+            'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
         ];
         
         // 円グラフ作成
@@ -482,10 +479,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: {
                         position: 'right',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
                     },
                     title: {
                         display: true,
-                        text: `${title} - 頭数分布`
+                        text: `${title} - 頭数分布`,
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
                     },
                     tooltip: {
                         callbacks: {
@@ -501,36 +507,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-        
-        // 棒グラフ作成（受胎率）
-        new Chart(barCanvas, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '受胎率 (%)',
-                    data: rates,
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `${title} - 受胎率`
-                    }
-                }
-            }
-        });
     }
     
     // 農場ごとの詳細分析結果表示
@@ -539,8 +515,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 各農場ごとにテーブルとグラフを作成
         for (const farm in farmData) {
-            resultHTML += `<h4>農場: ${farm}</h4>`;
-            resultHTML += `<table>
+            resultHTML += `<h4 class="farm-title">農場: ${farm}</h4>`;
+            resultHTML += `<table class="data-table">
                 <tr>
                     <th>区分</th>
                     <th>総数</th>
@@ -565,8 +541,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // グラフコンテナ作成
             const farmChartContainer = document.createElement('div');
-            farmChartContainer.className = 'farm-charts-container';
-            farmChartContainer.innerHTML = `<h4>農場: ${farm} - グラフ</h4>`;
+            farmChartContainer.className = 'farm-chart-container';
+            farmChartContainer.innerHTML = `<h4 class="chart-title">農場: ${farm} - グラフ</h4>`;
             advancedResults.appendChild(farmChartContainer);
             
             // 円グラフ用キャンバス
@@ -574,26 +550,17 @@ document.addEventListener('DOMContentLoaded', function() {
             pieCanvas.id = `farm-${farm}-pie-chart`.replace(/\s+/g, '-');
             farmChartContainer.appendChild(pieCanvas);
             
-            // 棒グラフ用キャンバス
-            const barCanvas = document.createElement('canvas');
-            barCanvas.id = `farm-${farm}-bar-chart`.replace(/\s+/g, '-');
-            farmChartContainer.appendChild(barCanvas);
-            
             // データ準備
             const labels = Object.keys(data);
             const values = labels.map(key => data[key].total);
-            const pregnantValues = labels.map(key => data[key].pregnant);
-            const rates = labels.map(key => 
-                data[key].total > 0 ? (data[key].pregnant / data[key].total * 100) : 0
-            );
             
             // 色の配列
             const backgroundColors = [
-                'rgba(54, 162, 235, 0.5)', 'rgba(255, 99, 132, 0.5)', 
-                'rgba(255, 206, 86, 0.5)', 'rgba(75, 192, 192, 0.5)',
-                'rgba(153, 102, 255, 0.5)', 'rgba(255, 159, 64, 0.5)',
-                'rgba(199, 199, 199, 0.5)', 'rgba(83, 102, 255, 0.5)', 
-                'rgba(40, 159, 64, 0.5)', 'rgba(210, 199, 199, 0.5)'
+                'rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)', 
+                'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+                'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)', 
+                'rgba(40, 159, 64, 0.8)', 'rgba(210, 199, 199, 0.8)'
             ];
             
             // 円グラフ作成
@@ -608,13 +575,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: {
                             position: 'right',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
                         },
                         title: {
                             display: true,
-                            text: `${farm} - 頭数分布`
+                            text: `${farm} - 頭数分布`,
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -626,36 +603,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     return `${key}: ${pregnant}/${total} (${rate}%)`;
                                 }
                             }
-                        }
-                    }
-                }
-            });
-            
-            // 棒グラフ作成（受胎率）
-            new Chart(barCanvas, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '受胎率 (%)',
-                        data: rates,
-                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${farm} - 受胎率`
                         }
                     }
                 }
