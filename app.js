@@ -6,8 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loading-indicator');
     
     // フィルター要素 - 花泉1号
-    const buildingFilter1 = document.getElementById('building-filter-1');
+    const yearFilter1 = document.getElementById('year-filter-1');
     const monthFilter1 = document.getElementById('month-filter-1');
+    const weekFilter1 = document.getElementById('week-filter-1');
+    const buildingFilter1 = document.getElementById('building-filter-1');
     const parityFilter1 = document.getElementById('parity-filter-1');
     const boarFilter1 = document.getElementById('boar-filter-1');
     const resetFilterBtn1 = document.getElementById('reset-filter-btn-1');
@@ -15,8 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterDescription1 = document.getElementById('filter-description-1');
     
     // フィルター要素 - 花泉2号
-    const buildingFilter2 = document.getElementById('building-filter-2');
+    const yearFilter2 = document.getElementById('year-filter-2');
     const monthFilter2 = document.getElementById('month-filter-2');
+    const weekFilter2 = document.getElementById('week-filter-2');
+    const buildingFilter2 = document.getElementById('building-filter-2');
     const parityFilter2 = document.getElementById('parity-filter-2');
     const boarFilter2 = document.getElementById('boar-filter-2');
     const resetFilterBtn2 = document.getElementById('reset-filter-btn-2');
@@ -28,12 +32,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const buildingStats1 = document.getElementById('building-stats-1');
     const parityStats1 = document.getElementById('parity-stats-1');
     const boarStats1 = document.getElementById('boar-stats-1');
+    const nonPregnantStats1 = document.getElementById('non-pregnant-stats-1');
     
     // 結果表示エリア - 花泉2号
     const overallStats2 = document.getElementById('overall-stats-2');
     const buildingStats2 = document.getElementById('building-stats-2');
     const parityStats2 = document.getElementById('parity-stats-2');
     const boarStats2 = document.getElementById('boar-stats-2');
+    const nonPregnantStats2 = document.getElementById('non-pregnant-stats-2');
     
     let selectedFile = null;
     let allData = [];
@@ -43,12 +49,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let farm2FilteredData = [];
     
     // 農場ごとのリスト
+    let farm1YearList = [];
     let farm1BuildingList = [];
     let farm1ParityList = [];
     let farm1BoarList = [];
+    let farm1WeekList = [];
+    
+    let farm2YearList = [];
     let farm2BuildingList = [];
     let farm2ParityList = [];
     let farm2BoarList = [];
+    let farm2WeekList = [];
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
@@ -100,14 +111,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     farm1FilteredData = [...farm1Data];
                     farm2FilteredData = [...farm2Data];
                     
-                    // 各農場のリストを抽出
-                    farm1BuildingList = [...new Set(farm1Data.map(row => row['豚舎'] || '不明'))].filter(building => building);
-                    farm1ParityList = [...new Set(farm1Data.map(row => row['産次'] || '不明'))].filter(parity => parity);
-                    farm1BoarList = [...new Set(farm1Data.map(row => row['雄豚・精液・あて雄'] || '不明'))].filter(boar => boar);
+                    // 農場1の各種リストを抽出
+                    extractFarm1Lists();
                     
-                    farm2BuildingList = [...new Set(farm2Data.map(row => row['豚舎'] || '不明'))].filter(building => building);
-                    farm2ParityList = [...new Set(farm2Data.map(row => row['産次'] || '不明'))].filter(parity => parity);
-                    farm2BoarList = [...new Set(farm2Data.map(row => row['雄豚・精液・あて雄'] || '不明'))].filter(boar => boar);
+                    // 農場2の各種リストを抽出
+                    extractFarm2Lists();
                     
                     // フィルターオプションを設定
                     populateFilterOptions();
@@ -133,9 +141,121 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
 
+    // 農場1の各種リストを抽出
+    function extractFarm1Lists() {
+        // 年リスト抽出
+        const yearSet = new Set();
+        farm1Data.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    yearSet.add(date.getFullYear());
+                }
+            }
+        });
+        farm1YearList = Array.from(yearSet).sort();
+        
+        // 豚舎リスト抽出
+        farm1BuildingList = [...new Set(farm1Data.map(row => row['豚舎'] || '不明'))].filter(building => building);
+        
+        // 産次リスト抽出
+        farm1ParityList = [...new Set(farm1Data.map(row => row['産次'] || '不明'))].filter(parity => parity);
+        
+        // 雄豚リスト抽出
+        farm1BoarList = [...new Set(farm1Data.map(row => row['雄豚・精液・あて雄'] || '不明'))].filter(boar => boar);
+        
+        // 週リスト抽出
+        const weekData = {};
+        farm1Data.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    if (!weekData[weekKey]) {
+                        weekData[weekKey] = {
+                            year: weekInfo.year,
+                            week: weekInfo.week,
+                            start: weekInfo.start,
+                            end: weekInfo.end,
+                            displayKey: `${weekInfo.year}年第${weekInfo.week}週 (${formatDate(weekInfo.start)}～${formatDate(weekInfo.end)})`
+                        };
+                    }
+                }
+            }
+        });
+        
+        // 週リストをソート
+        farm1WeekList = Object.values(weekData).sort((a, b) => {
+            if (a.year !== b.year) return a.year - b.year;
+            return a.week - b.week;
+        });
+    }
+    
+    // 農場2の各種リストを抽出
+    function extractFarm2Lists() {
+        // 年リスト抽出
+        const yearSet = new Set();
+        farm2Data.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    yearSet.add(date.getFullYear());
+                }
+            }
+        });
+        farm2YearList = Array.from(yearSet).sort();
+        
+        // 豚舎リスト抽出
+        farm2BuildingList = [...new Set(farm2Data.map(row => row['豚舎'] || '不明'))].filter(building => building);
+        
+        // 産次リスト抽出
+        farm2ParityList = [...new Set(farm2Data.map(row => row['産次'] || '不明'))].filter(parity => parity);
+        
+        // 雄豚リスト抽出
+        farm2BoarList = [...new Set(farm2Data.map(row => row['雄豚・精液・あて雄'] || '不明'))].filter(boar => boar);
+        
+        // 週リスト抽出
+        const weekData = {};
+        farm2Data.forEach(row => {
+            if (row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    if (!weekData[weekKey]) {
+                        weekData[weekKey] = {
+                            year: weekInfo.year,
+                            week: weekInfo.week,
+                            start: weekInfo.start,
+                            end: weekInfo.end,
+                            displayKey: `${weekInfo.year}年第${weekInfo.week}週 (${formatDate(weekInfo.start)}～${formatDate(weekInfo.end)})`
+                        };
+                    }
+                }
+            }
+        });
+        
+        // 週リストをソート
+        farm2WeekList = Object.values(weekData).sort((a, b) => {
+            if (a.year !== b.year) return a.year - b.year;
+            return a.week - b.week;
+        });
+    }
+    
     // フィルターオプションを設定
     function populateFilterOptions() {
         // 花泉1号のフィルターオプション
+        // 年フィルター
+        yearFilter1.innerHTML = '<option value="all">すべて</option>';
+        farm1YearList.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = `${year}年`;
+            yearFilter1.appendChild(option);
+        });
+        
+        // 豚舎フィルター
         buildingFilter1.innerHTML = '<option value="all">すべて</option>';
         farm1BuildingList.forEach(building => {
             const option = document.createElement('option');
@@ -144,6 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
             buildingFilter1.appendChild(option);
         });
         
+        // 産次フィルター
         parityFilter1.innerHTML = '<option value="all">すべて</option>';
         farm1ParityList.forEach(parity => {
             const option = document.createElement('option');
@@ -152,6 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
             parityFilter1.appendChild(option);
         });
         
+        // 雄豚フィルター
         boarFilter1.innerHTML = '<option value="all">すべて</option>';
         farm1BoarList.forEach(boar => {
             const option = document.createElement('option');
@@ -160,7 +282,26 @@ document.addEventListener('DOMContentLoaded', function() {
             boarFilter1.appendChild(option);
         });
         
+        // 週フィルター
+        weekFilter1.innerHTML = '<option value="all">すべて</option>';
+        farm1WeekList.forEach(weekInfo => {
+            const option = document.createElement('option');
+            option.value = `${weekInfo.year}-W${weekInfo.week}`;
+            option.textContent = weekInfo.displayKey;
+            weekFilter1.appendChild(option);
+        });
+        
         // 花泉2号のフィルターオプション
+        // 年フィルター
+        yearFilter2.innerHTML = '<option value="all">すべて</option>';
+        farm2YearList.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = `${year}年`;
+            yearFilter2.appendChild(option);
+        });
+        
+        // 豚舎フィルター
         buildingFilter2.innerHTML = '<option value="all">すべて</option>';
         farm2BuildingList.forEach(building => {
             const option = document.createElement('option');
@@ -169,6 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
             buildingFilter2.appendChild(option);
         });
         
+        // 産次フィルター
         parityFilter2.innerHTML = '<option value="all">すべて</option>';
         farm2ParityList.forEach(parity => {
             const option = document.createElement('option');
@@ -177,6 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
             parityFilter2.appendChild(option);
         });
         
+        // 雄豚フィルター
         boarFilter2.innerHTML = '<option value="all">すべて</option>';
         farm2BoarList.forEach(boar => {
             const option = document.createElement('option');
@@ -184,6 +327,55 @@ document.addEventListener('DOMContentLoaded', function() {
             option.textContent = boar;
             boarFilter2.appendChild(option);
         });
+        
+        // 週フィルター
+        weekFilter2.innerHTML = '<option value="all">すべて</option>';
+        farm2WeekList.forEach(weekInfo => {
+            const option = document.createElement('option');
+            option.value = `${weekInfo.year}-W${weekInfo.week}`;
+            option.textContent = weekInfo.displayKey;
+            weekFilter2.appendChild(option);
+        });
+        
+        // 年フィルターが変わったら週フィルターを更新
+        yearFilter1.addEventListener('change', function() {
+            updateWeekFilterByYear(1);
+        });
+        
+        yearFilter2.addEventListener('change', function() {
+            updateWeekFilterByYear(2);
+        });
+    }
+    
+    // 年フィルターに基づいて週フィルターを更新
+    function updateWeekFilterByYear(farmNum) {
+        const yearFilter = farmNum === 1 ? yearFilter1 : yearFilter2;
+        const weekFilter = farmNum === 1 ? weekFilter1 : weekFilter2;
+        const weekList = farmNum === 1 ? farm1WeekList : farm2WeekList;
+        
+        const selectedYear = yearFilter.value;
+        
+        // 「すべて」を選択した場合は全週を表示
+        if (selectedYear === 'all') {
+            weekFilter.innerHTML = '<option value="all">すべて</option>';
+            weekList.forEach(weekInfo => {
+                const option = document.createElement('option');
+                option.value = `${weekInfo.year}-W${weekInfo.week}`;
+                option.textContent = weekInfo.displayKey;
+                weekFilter.appendChild(option);
+            });
+        } else {
+            // 選択した年の週だけをフィルタリング
+            const filteredWeeks = weekList.filter(weekInfo => weekInfo.year == selectedYear);
+            
+            weekFilter.innerHTML = '<option value="all">すべて</option>';
+            filteredWeeks.forEach(weekInfo => {
+                const option = document.createElement('option');
+                option.value = `${weekInfo.year}-W${weekInfo.week}`;
+                option.textContent = weekInfo.displayKey;
+                weekFilter.appendChild(option);
+            });
+        }
     }
     
     // 日付のフォーマット
@@ -193,12 +385,44 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${month}/${day}`;
     }
     
+    // 日付から週情報を取得
+    function getWeekInfo(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        
+        // 日付をその週の月曜日に調整
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 日曜日の場合は前の週の月曜日
+        const monday = new Date(d.setDate(diff));
+        
+        // 週の日曜日
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        // 年と週番号を取得
+        const firstDayOfYear = new Date(monday.getFullYear(), 0, 1);
+        const pastDaysOfYear = (monday - firstDayOfYear) / 86400000;
+        const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        
+        return {
+            year: monday.getFullYear(),
+            week: weekNumber,
+            start: new Date(monday),
+            end: new Date(sunday)
+        };
+    }
+
     // フィルターリセットボタン - 花泉1号
     resetFilterBtn1.addEventListener('click', function() {
-        buildingFilter1.value = 'all';
+        yearFilter1.value = 'all';
         monthFilter1.value = 'all';
+        weekFilter1.value = 'all';
+        buildingFilter1.value = 'all';
         parityFilter1.value = 'all';
         boarFilter1.value = 'all';
+        
+        // 週フィルターを更新
+        updateWeekFilterByYear(1);
         
         farm1FilteredData = [...farm1Data];
         calculateFarm1Stats();
@@ -217,8 +441,13 @@ document.addEventListener('DOMContentLoaded', function() {
         let description = '条件: ';
         const filterStates = [];
         
-        if (buildingFilter1.value !== 'all') filterStates.push(`豚舎=${buildingFilter1.value}`);
+        if (yearFilter1.value !== 'all') filterStates.push(`${yearFilter1.value}年`);
         if (monthFilter1.value !== 'all') filterStates.push(`${monthFilter1.value}月`);
+        if (weekFilter1.value !== 'all') {
+            const weekOption = weekFilter1.options[weekFilter1.selectedIndex];
+            filterStates.push(weekOption.textContent);
+        }
+        if (buildingFilter1.value !== 'all') filterStates.push(`豚舎=${buildingFilter1.value}`);
         if (parityFilter1.value !== 'all') filterStates.push(`産次=${parityFilter1.value}`);
         if (boarFilter1.value !== 'all') filterStates.push(`雄豚=${boarFilter1.value}`);
         
@@ -233,6 +462,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // フィルター適用関数 - 花泉1号
     function applyFilters1() {
         farm1FilteredData = farm1Data.filter(row => {
+            // 年フィルター
+            if (yearFilter1.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    if (parseInt(yearFilter1.value) !== year) {
+                        return false;
+                    }
+                }
+            }
+            
             // 豚舎フィルター
             if (buildingFilter1.value !== 'all' && row['豚舎'] !== buildingFilter1.value) {
                 return false;
@@ -259,6 +499,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // 週フィルター
+            if (weekFilter1.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    if (weekFilter1.value !== weekKey) {
+                        return false;
+                    }
+                }
+            }
+            
             return true;
         });
         
@@ -267,10 +519,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // フィルターリセットボタン - 花泉2号
     resetFilterBtn2.addEventListener('click', function() {
-        buildingFilter2.value = 'all';
+        yearFilter2.value = 'all';
         monthFilter2.value = 'all';
+        weekFilter2.value = 'all';
+        buildingFilter2.value = 'all';
         parityFilter2.value = 'all';
         boarFilter2.value = 'all';
+        
+        // 週フィルターを更新
+        updateWeekFilterByYear(2);
         
         farm2FilteredData = [...farm2Data];
         calculateFarm2Stats();
@@ -289,8 +546,13 @@ document.addEventListener('DOMContentLoaded', function() {
         let description = '条件: ';
         const filterStates = [];
         
-        if (buildingFilter2.value !== 'all') filterStates.push(`豚舎=${buildingFilter2.value}`);
+        if (yearFilter2.value !== 'all') filterStates.push(`${yearFilter2.value}年`);
         if (monthFilter2.value !== 'all') filterStates.push(`${monthFilter2.value}月`);
+        if (weekFilter2.value !== 'all') {
+            const weekOption = weekFilter2.options[weekFilter2.selectedIndex];
+            filterStates.push(weekOption.textContent);
+        }
+        if (buildingFilter2.value !== 'all') filterStates.push(`豚舎=${buildingFilter2.value}`);
         if (parityFilter2.value !== 'all') filterStates.push(`産次=${parityFilter2.value}`);
         if (boarFilter2.value !== 'all') filterStates.push(`雄豚=${boarFilter2.value}`);
         
@@ -305,6 +567,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // フィルター適用関数 - 花泉2号
     function applyFilters2() {
         farm2FilteredData = farm2Data.filter(row => {
+            // 年フィルター
+            if (yearFilter2.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    if (parseInt(yearFilter2.value) !== year) {
+                        return false;
+                    }
+                }
+            }
+            
             // 豚舎フィルター
             if (buildingFilter2.value !== 'all' && row['豚舎'] !== buildingFilter2.value) {
                 return false;
@@ -331,6 +604,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // 週フィルター
+            if (weekFilter2.value !== 'all' && row['種付日']) {
+                const date = new Date(row['種付日']);
+                if (!isNaN(date.getTime())) {
+                    const weekInfo = getWeekInfo(date);
+                    const weekKey = `${weekInfo.year}-W${weekInfo.week}`;
+                    if (weekFilter2.value !== weekKey) {
+                        return false;
+                    }
+                }
+            }
+            
             return true;
         });
         
@@ -350,6 +635,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 雄豚・精液別統計
         calculateFarm1BoarStats();
+        
+        // 不受胎母豚一覧
+        calculateFarm1NonPregnantStats();
     }
     
     // 花泉2号の統計計算・表示
@@ -365,8 +653,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 雄豚・精液別統計
         calculateFarm2BoarStats();
+        
+        // 不受胎母豚一覧
+        calculateFarm2NonPregnantStats();
     }
-    
+
     // 花泉1号の全体統計
     function calculateFarm1OverallStats() {
         const total = farm1FilteredData.length;
@@ -604,6 +895,71 @@ document.addEventListener('DOMContentLoaded', function() {
         if (totalAll > 0) {
             createDataDistributionPieChart('boar-chart-1', '雄豚・精液別データ分布', boarData);
         }
+    }
+    
+    // 花泉1号の不受胎母豚一覧
+    function calculateFarm1NonPregnantStats() {
+        // 不受胎データをフィルタリング
+        const nonPregnantData = farm1FilteredData.filter(row => {
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            return result !== '受胎確定' && result !== '';
+        });
+        
+        // テーブル生成
+        let html = `
+            <h3>不受胎母豚一覧</h3>
+        `;
+        
+        if (nonPregnantData.length === 0) {
+            html += `<p class="no-data">該当データがありません</p>`;
+            nonPregnantStats1.innerHTML = html;
+            return;
+        }
+        
+        html += `
+            <div class="table-container">
+                <table class="non-pregnant-table">
+                    <tr>
+                        <th>種付日</th>
+                        <th>母豚番号</th>
+                        <th>雄豚・精液</th>
+                        <th>分娩予定日</th>
+                        <th>産次</th>
+                        <th>離乳後交配日数</th>
+                        <th>流産日</th>
+                        <th>母豚廃用日</th>
+                    </tr>
+        `;
+        
+        // データをソート（種付日の降順）
+        nonPregnantData.sort((a, b) => {
+            const dateA = new Date(a['種付日'] || '');
+            const dateB = new Date(b['種付日'] || '');
+            return dateB - dateA; // 降順
+        });
+        
+        // 行の生成
+        nonPregnantData.forEach(row => {
+            html += `
+                <tr>
+                    <td>${row['種付日'] || ''}</td>
+                    <td>${row['母豚番号'] || ''}</td>
+                    <td>${row['雄豚・精液・あて雄'] || ''}</td>
+                    <td>${row['分娩予定日'] || ''}</td>
+                    <td>${row['産次'] || ''}</td>
+                    <td>${row['離乳後交配日数'] || ''}</td>
+                    <td>${row['流産日'] || ''}</td>
+                    <td>${row['母豚廃用日'] || ''}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                </table>
+            </div>
+        `;
+        
+        nonPregnantStats1.innerHTML = html;
     }
 
     // 花泉2号の全体統計
@@ -845,6 +1201,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // 花泉2号の不受胎母豚一覧
+    function calculateFarm2NonPregnantStats() {
+        // 不受胎データをフィルタリング
+        const nonPregnantData = farm2FilteredData.filter(row => {
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            return result !== '受胎確定' && result !== '';
+        });
+        
+        // テーブル生成
+        let html = `
+            <h3>不受胎母豚一覧</h3>
+        `;
+        
+        if (nonPregnantData.length === 0) {
+            html += `<p class="no-data">該当データがありません</p>`;
+            nonPregnantStats2.innerHTML = html;
+            return;
+        }
+        
+        html += `
+            <div class="table-container">
+                <table class="non-pregnant-table">
+                    <tr>
+                        <th>種付日</th>
+                        <th>母豚番号</th>
+                        <th>雄豚・精液</th>
+                        <th>分娩予定日</th>
+                        <th>産次</th>
+                        <th>離乳後交配日数</th>
+                        <th>流産日</th>
+                        <th>母豚廃用日</th>
+                    </tr>
+        `;
+        
+        // データをソート（種付日の降順）
+        nonPregnantData.sort((a, b) => {
+            const dateA = new Date(a['種付日'] || '');
+            const dateB = new Date(b['種付日'] || '');
+            return dateB - dateA; // 降順
+        });
+        
+        // 行の生成
+        nonPregnantData.forEach(row => {
+            html += `
+                <tr>
+                    <td>${row['種付日'] || ''}</td>
+                    <td>${row['母豚番号'] || ''}</td>
+                    <td>${row['雄豚・精液・あて雄'] || ''}</td>
+                    <td>${row['分娩予定日'] || ''}</td>
+                    <td>${row['産次'] || ''}</td>
+                    <td>${row['離乳後交配日数'] || ''}</td>
+                    <td>${row['流産日'] || ''}</td>
+                    <td>${row['母豚廃用日'] || ''}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                </table>
+            </div>
+        `;
+        
+        nonPregnantStats2.innerHTML = html;
+    }
+
     // 円グラフ作成
     function createPieChart(containerId, title, data, labels, colors) {
         const container = document.getElementById(containerId);
