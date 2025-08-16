@@ -60,6 +60,36 @@ document.addEventListener('DOMContentLoaded', function() {
     let farm2ParityList = [];
     let farm2BoarList = [];
     let farm2WeekList = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // ユーティリティ関数を先に定義
+    // 雄豚名をアルファベット順→数字順にソートする関数
+    function sortBoarNames(a, b) {
+        // 特殊ケース: '不明'は常に最後に
+        if (a === '不明') return 1;
+        if (b === '不明') return -1;
+        
+        // アルファベットと数字を分離する正規表現
+        const regExp = /([A-Za-z]+)(\d*)/;
+        
+        const matchA = a.match(regExp);
+        const matchB = b.match(regExp);
+        
+        // マッチしない場合は文字列としてそのまま比較
+        if (!matchA || !matchB) return a.localeCompare(b);
+        
+        const alphaA = matchA[1]; // アルファベット部分
+        const alphaB = matchB[1];
+        
+        // アルファベットが異なる場合はそれで比較
+        if (alphaA !== alphaB) return alphaA.localeCompare(alphaB);
+        
+        // アルファベットが同じ場合は数字部分を数値として比較
+        const numA = matchA[2] ? parseInt(matchA[2], 10) : 0;
+        const numB = matchB[2] ? parseInt(matchB[2], 10) : 0;
+        
+        return numA - numB;
+    }
     
     // ファイル選択時の処理
     fileInput.addEventListener('change', function(e) {
@@ -833,69 +863,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 花泉1号の雄豚・精液別統計
-    function calculateFarm1BoarStats() {
-        const boarData = {};
+function calculateFarm1BoarStats() {
+    const boarData = {};
+    
+    farm1FilteredData.forEach(row => {
+        const boar = row['雄豚・精液・あて雄'] || '不明';
+        if (!boarData[boar]) {
+            boarData[boar] = { total: 0, pregnant: 0 };
+        }
         
-        farm1FilteredData.forEach(row => {
-            const boar = row['雄豚・精液・あて雄'] || '不明';
-            if (!boarData[boar]) {
-                boarData[boar] = { total: 0, pregnant: 0 };
-            }
-            
-            boarData[boar].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                boarData[boar].pregnant++;
-            }
+        boarData[boar].total++;
+        const result = (row['妊娠鑑定結果'] || '').trim();
+        if (result === '受胎確定') {
+            boarData[boar].pregnant++;
+        }
+    });
+    
+    // 雄豚をアルファベット順→数字順にソート
+    const sortedBoarData = {};
+    Object.keys(boarData)
+        .sort(sortBoarNames)
+        .forEach(boar => {
+            sortedBoarData[boar] = boarData[boar];
         });
+    
+    // HTML生成
+    let html = `
+        <h3>雄豚・精液別受胎率</h3>
+        <table class="data-table">
+            <tr>
+                <th>雄豚・精液</th>
+                <th>総数</th>
+                <th>受胎数</th>
+                <th>受胎率</th>
+            </tr>
+    `;
+    
+    // 全体の集計
+    let totalAll = 0;
+    let pregnantAll = 0;
+    
+    for (const boar in sortedBoarData) {  // sortedBoarDataを使用
+        const rate = sortedBoarData[boar].total > 0 ? 
+            (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
         
-        // HTML生成
-        let html = `
-            <h3>雄豚・精液別受胎率</h3>
-            <table class="data-table">
-                <tr>
-                    <th>雄豚・精液</th>
-                    <th>総数</th>
-                    <th>受胎数</th>
-                    <th>受胎率</th>
-                </tr>
+        html += `
+            <tr>
+                <td>${boar}</td>
+                <td>${sortedBoarData[boar].total}</td>
+                <td>${sortedBoarData[boar].pregnant}</td>
+                <td>${rate}%</td>
+            </tr>
         `;
         
-        // 全体の集計
-        let totalAll = 0;
-        let pregnantAll = 0;
-        
-        for (const boar in boarData) {
-            const rate = boarData[boar].total > 0 ? 
-                (boarData[boar].pregnant / boarData[boar].total * 100).toFixed(2) : 0;
-            
-            html += `
-                <tr>
-                    <td>${boar}</td>
-                    <td>${boarData[boar].total}</td>
-                    <td>${boarData[boar].pregnant}</td>
-                    <td>${rate}%</td>
-                </tr>
-            `;
-            
-            totalAll += boarData[boar].total;
-            pregnantAll += boarData[boar].pregnant;
-        }
-        
-        // 合計行
-        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-        
-        html += `</table>`;
-        html += `<div class="chart-container" id="boar-chart-1"></div>`;
-        
-        boarStats1.innerHTML = html;
-        
-        // 円グラフ
-        if (totalAll > 0) {
-            createDataDistributionPieChart('boar-chart-1', '雄豚・精液別データ分布', boarData);
-        }
+        totalAll += sortedBoarData[boar].total;
+        pregnantAll += sortedBoarData[boar].pregnant;
     }
+    
+    // 合計行
+    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+    
+    html += `</table>`;
+    html += `<div class="chart-container" id="boar-chart-1"></div>`;
+    
+    boarStats1.innerHTML = html;
+    
+    // 円グラフ
+    if (totalAll > 0) {
+        createDataDistributionPieChart('boar-chart-1', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
+    }
+}
     
     // 花泉1号の不受胎母豚一覧
     function calculateFarm1NonPregnantStats() {
@@ -1137,69 +1175,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 花泉2号の雄豚・精液別統計
-    function calculateFarm2BoarStats() {
-        const boarData = {};
+function calculateFarm2BoarStats() {
+    const boarData = {};
+    
+    farm2FilteredData.forEach(row => {
+        const boar = row['雄豚・精液・あて雄'] || '不明';
+        if (!boarData[boar]) {
+            boarData[boar] = { total: 0, pregnant: 0 };
+        }
         
-        farm2FilteredData.forEach(row => {
-            const boar = row['雄豚・精液・あて雄'] || '不明';
-            if (!boarData[boar]) {
-                boarData[boar] = { total: 0, pregnant: 0 };
-            }
-            
-            boarData[boar].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                boarData[boar].pregnant++;
-            }
+        boarData[boar].total++;
+        const result = (row['妊娠鑑定結果'] || '').trim();
+        if (result === '受胎確定') {
+            boarData[boar].pregnant++;
+        }
+    });
+    
+    // 雄豚をアルファベット順→数字順にソート
+    const sortedBoarData = {};
+    Object.keys(boarData)
+        .sort(sortBoarNames)
+        .forEach(boar => {
+            sortedBoarData[boar] = boarData[boar];
         });
+    
+    // HTML生成
+    let html = `
+        <h3>雄豚・精液別受胎率</h3>
+        <table class="data-table">
+            <tr>
+                <th>雄豚・精液</th>
+                <th>総数</th>
+                <th>受胎数</th>
+                <th>受胎率</th>
+            </tr>
+    `;
+    
+    // 全体の集計
+    let totalAll = 0;
+    let pregnantAll = 0;
+    
+    for (const boar in sortedBoarData) {  // sortedBoarDataを使用
+        const rate = sortedBoarData[boar].total > 0 ? 
+            (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
         
-        // HTML生成
-        let html = `
-            <h3>雄豚・精液別受胎率</h3>
-            <table class="data-table">
-                <tr>
-                    <th>雄豚・精液</th>
-                    <th>総数</th>
-                    <th>受胎数</th>
-                    <th>受胎率</th>
-                </tr>
+        html += `
+            <tr>
+                <td>${boar}</td>
+                <td>${sortedBoarData[boar].total}</td>
+                <td>${sortedBoarData[boar].pregnant}</td>
+                <td>${rate}%</td>
+            </tr>
         `;
         
-        // 全体の集計
-        let totalAll = 0;
-        let pregnantAll = 0;
-        
-        for (const boar in boarData) {
-            const rate = boarData[boar].total > 0 ? 
-                (boarData[boar].pregnant / boarData[boar].total * 100).toFixed(2) : 0;
-            
-            html += `
-                <tr>
-                    <td>${boar}</td>
-                    <td>${boarData[boar].total}</td>
-                    <td>${boarData[boar].pregnant}</td>
-                    <td>${rate}%</td>
-                </tr>
-            `;
-            
-            totalAll += boarData[boar].total;
-            pregnantAll += boarData[boar].pregnant;
-        }
-        
-        // 合計行
-        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-        
-        html += `</table>`;
-        html += `<div class="chart-container" id="boar-chart-2"></div>`;
-        
-        boarStats2.innerHTML = html;
-        
-        // 円グラフ
-        if (totalAll > 0) {
-            createDataDistributionPieChart('boar-chart-2', '雄豚・精液別データ分布', boarData);
-        }
+        totalAll += sortedBoarData[boar].total;
+        pregnantAll += sortedBoarData[boar].pregnant;
     }
+    
+    // 合計行
+    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+    
+    html += `</table>`;
+    html += `<div class="chart-container" id="boar-chart-2"></div>`;
+    
+    boarStats2.innerHTML = html;
+    
+    // 円グラフ
+    if (totalAll > 0) {
+        createDataDistributionPieChart('boar-chart-2', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
+    }
+}
     
     // 花泉2号の不受胎母豚一覧
     function calculateFarm2NonPregnantStats() {
