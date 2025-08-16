@@ -901,8 +901,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculateFarm1NonPregnantStats() {
         // 不受胎データをフィルタリング
         const nonPregnantData = farm1FilteredData.filter(row => {
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            return result !== '受胎確定' && result !== '';
+    const result = (row['妊娠鑑定結果'] || '').trim();
+    return result !== '受胎確定';  // 空白チェックの条件（&& result !== ''）を削除
         });
         
         // テーブル生成
@@ -1203,11 +1203,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 花泉2号の不受胎母豚一覧
     function calculateFarm2NonPregnantStats() {
-        // 不受胎データをフィルタリング
-        const nonPregnantData = farm2FilteredData.filter(row => {
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            return result !== '受胎確定' && result !== '';
-        });
+       // 不受胎データをフィルタリング
+const nonPregnantData = farm2FilteredData.filter(row => {
+    const result = (row['妊娠鑑定結果'] || '').trim();
+    return result !== '受胎確定';  // 空白チェックの条件（&& result !== ''）を削除
+});
         
         // テーブル生成
         let html = `
