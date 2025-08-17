@@ -26,7 +26,29 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return numA - numB;
     }
+
+    // 豚舎名をソートする関数（経産種豚舎 → 育成種豚舎の順）
+function sortBuildingNames(a, b) {
+    // 特殊ケース: '不明'は常に最後に
+    if (a === '不明') return 1;
+    if (b === '不明') return -1;
     
+    // 経産種豚舎が最初に来るようにする
+    if (a.includes('経産種豚舎') && !b.includes('経産種豚舎')) return -1;
+    if (!a.includes('経産種豚舎') && b.includes('経産種豚舎')) return 1;
+    
+    // どちらも経産か育成の場合は数字で比較
+    if ((a.includes('経産種豚舎') && b.includes('経産種豚舎')) || 
+        (a.includes('育成種豚舎') && b.includes('育成種豚舎'))) {
+        // 数字部分を抽出して比較
+        const numA = parseInt(a.match(/(\d+)/)?.[1] || '0', 10);
+        const numB = parseInt(b.match(/(\d+)/)?.[1] || '0', 10);
+        return numA - numB;
+    }
+    
+    // それ以外は通常の文字列比較
+    return a.localeCompare(b);
+}
     // DOM要素の参照を取得
     const fileInput = document.getElementById('csvFile');
     const encodingSelect = document.getElementById('encoding');
@@ -733,70 +755,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 花泉1号の豚舎別統計
-    function calculateFarm1BuildingStats() {
-        const buildingData = {};
+   // 花泉1号の豚舎別統計
+function calculateFarm1BuildingStats() {
+    const buildingData = {};
+    
+    farm1FilteredData.forEach(row => {
+        const building = row['豚舎'] || '不明';
+        if (!buildingData[building]) {
+            buildingData[building] = { total: 0, pregnant: 0 };
+        }
         
-        farm1FilteredData.forEach(row => {
-            const building = row['豚舎'] || '不明';
-            if (!buildingData[building]) {
-                buildingData[building] = { total: 0, pregnant: 0 };
-            }
-            
-            buildingData[building].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                buildingData[building].pregnant++;
-            }
+        buildingData[building].total++;
+        const result = (row['妊娠鑑定結果'] || '').trim();
+        if (result === '受胎確定') {
+            buildingData[building].pregnant++;
+        }
+    });
+    
+    // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
+    const sortedBuildingData = {};
+    Object.keys(buildingData)
+        .sort(sortBuildingNames)
+        .forEach(building => {
+            sortedBuildingData[building] = buildingData[building];
         });
+    
+    // HTML生成
+    let html = `
+        <h3>豚舎別受胎率</h3>
+        <table class="data-table">
+            <tr>
+                <th>豚舎</th>
+                <th>総数</th>
+                <th>受胎数</th>
+                <th>受胎率</th>
+            </tr>
+    `;
+    
+    // 全体の集計
+    let totalAll = 0;
+    let pregnantAll = 0;
+    
+    for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
+        const rate = sortedBuildingData[building].total > 0 ? 
+            (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
         
-        // HTML生成
-        let html = `
-            <h3>豚舎別受胎率</h3>
-            <table class="data-table">
-                <tr>
-                    <th>豚舎</th>
-                    <th>総数</th>
-                    <th>受胎数</th>
-                    <th>受胎率</th>
-                </tr>
+        html += `
+            <tr>
+                <td>${building}</td>
+                <td>${sortedBuildingData[building].total}</td>
+                <td>${sortedBuildingData[building].pregnant}</td>
+                <td>${rate}%</td>
+            </tr>
         `;
         
-        // 全体の集計
-        let totalAll = 0;
-        let pregnantAll = 0;
-        
-        for (const building in buildingData) {
-            const rate = buildingData[building].total > 0 ? 
-                (buildingData[building].pregnant / buildingData[building].total * 100).toFixed(2) : 0;
-            
-            html += `
-                <tr>
-                    <td>${building}</td>
-                    <td>${buildingData[building].total}</td>
-                    <td>${buildingData[building].pregnant}</td>
-                    <td>${rate}%</td>
-                </tr>
-            `;
-            
-            totalAll += buildingData[building].total;
-            pregnantAll += buildingData[building].pregnant;
-        }
-        
-        // 合計行
-        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-        
-        html += `</table>`;
-        html += `<div class="chart-container" id="building-chart-1"></div>`;
-        
-        buildingStats1.innerHTML = html;
-        
-        // 円グラフ
-        if (totalAll > 0) {
-            createDataDistributionPieChart('building-chart-1', '豚舎別データ分布', buildingData);
-        }
+        totalAll += sortedBuildingData[building].total;
+        pregnantAll += sortedBuildingData[building].pregnant;
     }
+    
+    // 合計行
+    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+    
+    html += `</table>`;
+    html += `<div class="chart-container" id="building-chart-1"></div>`;
+    
+    buildingStats1.innerHTML = html;
+    
+    // 円グラフ
+    if (totalAll > 0) {
+        createDataDistributionPieChart('building-chart-1', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
+    }
+}
     
     // 花泉1号の産次別統計
     function calculateFarm1ParityStats() {
@@ -1045,70 +1075,78 @@ function calculateFarm1BoarStats() {
         }
     }
     
-    // 花泉2号の豚舎別統計
-    function calculateFarm2BuildingStats() {
-        const buildingData = {};
+   // 花泉2号の豚舎別統計
+function calculateFarm2BuildingStats() {
+    const buildingData = {};
+    
+    farm2FilteredData.forEach(row => {
+        const building = row['豚舎'] || '不明';
+        if (!buildingData[building]) {
+            buildingData[building] = { total: 0, pregnant: 0 };
+        }
         
-        farm2FilteredData.forEach(row => {
-            const building = row['豚舎'] || '不明';
-            if (!buildingData[building]) {
-                buildingData[building] = { total: 0, pregnant: 0 };
-            }
-            
-            buildingData[building].total++;
-            const result = (row['妊娠鑑定結果'] || '').trim();
-            if (result === '受胎確定') {
-                buildingData[building].pregnant++;
-            }
+        buildingData[building].total++;
+        const result = (row['妊娠鑑定結果'] || '').trim();
+        if (result === '受胎確定') {
+            buildingData[building].pregnant++;
+        }
+    });
+    
+    // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
+    const sortedBuildingData = {};
+    Object.keys(buildingData)
+        .sort(sortBuildingNames)
+        .forEach(building => {
+            sortedBuildingData[building] = buildingData[building];
         });
+    
+    // HTML生成
+    let html = `
+        <h3>豚舎別受胎率</h3>
+        <table class="data-table">
+            <tr>
+                <th>豚舎</th>
+                <th>総数</th>
+                <th>受胎数</th>
+                <th>受胎率</th>
+            </tr>
+    `;
+    
+    // 全体の集計
+    let totalAll = 0;
+    let pregnantAll = 0;
+    
+    for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
+        const rate = sortedBuildingData[building].total > 0 ? 
+            (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
         
-        // HTML生成
-        let html = `
-            <h3>豚舎別受胎率</h3>
-            <table class="data-table">
-                <tr>
-                    <th>豚舎</th>
-                    <th>総数</th>
-                    <th>受胎数</th>
-                    <th>受胎率</th>
-                </tr>
+        html += `
+            <tr>
+                <td>${building}</td>
+                <td>${sortedBuildingData[building].total}</td>
+                <td>${sortedBuildingData[building].pregnant}</td>
+                <td>${rate}%</td>
+            </tr>
         `;
         
-        // 全体の集計
-        let totalAll = 0;
-        let pregnantAll = 0;
-        
-        for (const building in buildingData) {
-            const rate = buildingData[building].total > 0 ? 
-                (buildingData[building].pregnant / buildingData[building].total * 100).toFixed(2) : 0;
-            
-            html += `
-                <tr>
-                    <td>${building}</td>
-                    <td>${buildingData[building].total}</td>
-                    <td>${buildingData[building].pregnant}</td>
-                    <td>${rate}%</td>
-                </tr>
-            `;
-            
-            totalAll += buildingData[building].total;
-            pregnantAll += buildingData[building].pregnant;
-        }
-        
-        // 合計行
-        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-        
-        html += `</table>`;
-        html += `<div class="chart-container" id="building-chart-2"></div>`;
-        
-        buildingStats2.innerHTML = html;
-        
-        // 円グラフ
-        if (totalAll > 0) {
-            createDataDistributionPieChart('building-chart-2', '豚舎別データ分布', buildingData);
-        }
+        totalAll += sortedBuildingData[building].total;
+        pregnantAll += sortedBuildingData[building].pregnant;
     }
+    
+    // 合計行
+    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+    
+    html += `</table>`;
+    html += `<div class="chart-container" id="building-chart-2"></div>`;
+    
+    buildingStats2.innerHTML = html;
+    
+    // 円グラフ
+    if (totalAll > 0) {
+        createDataDistributionPieChart('building-chart-2', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
+    }
+}
     
     // 花泉2号の産次別統計
     function calculateFarm2ParityStats() {
