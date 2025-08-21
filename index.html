@@ -1,5 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +16,32 @@
         <h1>豚受胎率分析ツール</h1>
         
         <div class="upload-section">
+            <div id="authSection" class="auth-section">
+  <h2>ログイン / 新規登録</h2>
+  <div class="auth-form">
+    <input type="email" id="emailInput" placeholder="メールアドレス">
+    <input type="password" id="passwordInput" placeholder="パスワード">
+    <div class="auth-buttons">
+      <button id="signInBtn">ログイン</button>
+      <button id="signUpBtn">新規登録</button>
+    </div>
+    <button id="googleSignInBtn" class="google-btn">Googleでログイン</button>
+  </div>
+</div>
+
+<div id="userSection" class="user-section" style="display:none;">
+  <div class="user-info">
+    <p>ログイン中: <span id="userEmail"></span></p>
+    <button id="signOutBtn">ログアウト</button>
+  </div>
+</div>
+
+<div class="saved-files-section" style="display:none;">
+  <h2>保存済みファイル</h2>
+  <div class="saved-files-list">
+    <!-- ここに保存されたファイルのリストが表示されます -->
+  </div>
+</div>
             <h2>CSVファイルをアップロード</h2>
             <input type="file" id="csvFile" accept=".csv">
             <div class="encoding-selector">
