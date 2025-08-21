@@ -373,3 +373,93 @@ button:hover {
         font-size: 0.9em;
     }
 }
+
+/* 認証セクション */
+.auth-section, .user-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.auth-form input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.google-btn {
+  background-color: #4285F4;
+}
+
+.user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 保存済みファイルセクション */
+.saved-files-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.saved-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #3498db;
+}
+
+.saved-file-info {
+  flex-grow: 1;
+}
+
+.saved-file-name {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.saved-file-date {
+  font-size: 0.85em;
+  color: #7f8c8d;
+}
+
+.saved-file-actions {
+  display: flex;
+}
+
+.saved-file-actions button {
+  margin-left: 8px;
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+
+.load-file-btn {
+  background-color: #27ae60;
+}
+
+.delete-file-btn {
+  background-color: #e74c3c;
+}
