@@ -3,7 +3,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAnnxQRTEhZkgYn58FiKq9FpHUx3hOxPnU",
   authDomain: "pig-fertility-analyzer.firebaseapp.com",
   projectId: "pig-fertility-analyzer",
-  storageBucket: "pig-fertility-analyzer.firebasestorage.app",
+  storageBucket: "pig-fertility-analyzer.appspot.com",
   messagingSenderId: "246286434358",
   appId: "1:246286434358:web:f37be99c02854fcef2d897"
 };
@@ -15,7 +15,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
-
 
 document.addEventListener('DOMContentLoaded', function() {
     // Firebase認証関連の要素
@@ -31,6 +30,120 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedFilesSection = document.querySelector('.saved-files-section');
     const savedFilesList = document.querySelector('.saved-files-list');
     
+    // DOM要素の参照を取得
+    const fileInput = document.getElementById('csvFile');
+    const encodingSelect = document.getElementById('encoding');
+    const startAnalysisBtn = document.getElementById('start-analysis-btn');
+    const analysisContainer = document.querySelector('.analysis-container');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    
+    // フィルター要素 - 花泉1号
+    const yearFilter1 = document.getElementById('year-filter-1');
+    const monthFilter1 = document.getElementById('month-filter-1');
+    const weekFilter1 = document.getElementById('week-filter-1');
+    const buildingFilter1 = document.getElementById('building-filter-1');
+    const parityFilter1 = document.getElementById('parity-filter-1');
+    const boarFilter1 = document.getElementById('boar-filter-1');
+    const resetFilterBtn1 = document.getElementById('reset-filter-btn-1');
+    const applyFilterBtn1 = document.getElementById('apply-filter-btn-1');
+    const filterDescription1 = document.getElementById('filter-description-1');
+    
+    // フィルター要素 - 花泉2号
+    const yearFilter2 = document.getElementById('year-filter-2');
+    const monthFilter2 = document.getElementById('month-filter-2');
+    const weekFilter2 = document.getElementById('week-filter-2');
+    const buildingFilter2 = document.getElementById('building-filter-2');
+    const parityFilter2 = document.getElementById('parity-filter-2');
+    const boarFilter2 = document.getElementById('boar-filter-2');
+    const resetFilterBtn2 = document.getElementById('reset-filter-btn-2');
+    const applyFilterBtn2 = document.getElementById('apply-filter-btn-2');
+    const filterDescription2 = document.getElementById('filter-description-2');
+    
+    // 結果表示エリア - 花泉1号
+    const overallStats1 = document.getElementById('overall-stats-1');
+    const buildingStats1 = document.getElementById('building-stats-1');
+    const parityStats1 = document.getElementById('parity-stats-1');
+    const boarStats1 = document.getElementById('boar-stats-1');
+    const nonPregnantStats1 = document.getElementById('non-pregnant-stats-1');
+    
+    // 結果表示エリア - 花泉2号
+    const overallStats2 = document.getElementById('overall-stats-2');
+    const buildingStats2 = document.getElementById('building-stats-2');
+    const parityStats2 = document.getElementById('parity-stats-2');
+    const boarStats2 = document.getElementById('boar-stats-2');
+    const nonPregnantStats2 = document.getElementById('non-pregnant-stats-2');
+    
+    let selectedFile = null;
+    let allData = [];
+    let farm1Data = [];
+    let farm2Data = [];
+    let farm1FilteredData = [];
+    let farm2FilteredData = [];
+    
+    // 農場ごとのリスト
+    let farm1YearList = [];
+    let farm1BuildingList = [];
+    let farm1ParityList = [];
+    let farm1BoarList = [];
+    let farm1WeekList = [];
+    
+    let farm2YearList = [];
+    let farm2BuildingList = [];
+    let farm2ParityList = [];
+    let farm2BoarList = [];
+    let farm2WeekList = [];
+    
+    // ユーティリティ関数を定義
+    function sortBoarNames(a, b) {
+        // 特殊ケース: '不明'は常に最後に
+        if (a === '不明') return 1;
+        if (b === '不明') return -1;
+        
+        // アルファベットと数字を分離する正規表現
+        const regExp = /([A-Za-z]+)(\d*)/;
+        
+        const matchA = a.match(regExp);
+        const matchB = b.match(regExp);
+        
+        // マッチしない場合は文字列としてそのまま比較
+        if (!matchA || !matchB) return a.localeCompare(b);
+        
+        const alphaA = matchA[1]; // アルファベット部分
+        const alphaB = matchB[1];
+        
+        // アルファベットが異なる場合はそれで比較
+        if (alphaA !== alphaB) return alphaA.localeCompare(alphaB);
+        
+        // アルファベットが同じ場合は数字部分を数値として比較
+        const numA = matchA[2] ? parseInt(matchA[2], 10) : 0;
+        const numB = matchB[2] ? parseInt(matchB[2], 10) : 0;
+        
+        return numA - numB;
+    }
+
+    // 豚舎名をソートする関数（経産種豚舎 → 育成種豚舎の順）
+    function sortBuildingNames(a, b) {
+        // 特殊ケース: '不明'は常に最後に
+        if (a === '不明') return 1;
+        if (b === '不明') return -1;
+        
+        // 経産種豚舎が最初に来るようにする
+        if (a.includes('経産種豚舎') && !b.includes('経産種豚舎')) return -1;
+        if (!a.includes('経産種豚舎') && b.includes('経産種豚舎')) return 1;
+        
+        // どちらも経産か育成の場合は数字で比較
+        if ((a.includes('経産種豚舎') && b.includes('経産種豚舎')) || 
+            (a.includes('育成種豚舎') && b.includes('育成種豚舎'))) {
+            // 数字部分を抽出して比較
+            const numA = parseInt(a.match(/(\d+)/)?.[1] || '0', 10);
+            const numB = parseInt(b.match(/(\d+)/)?.[1] || '0', 10);
+            return numA - numB;
+        }
+        
+        // それ以外は通常の文字列比較
+        return a.localeCompare(b);
+    }
+    
     // 認証状態監視
     let currentUser = null;
     auth.onAuthStateChanged(user => {
@@ -43,6 +156,80 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // メールでサインイン
+    signInBtn.addEventListener('click', function() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!email || !password) {
+            alert('メールアドレスとパスワードを入力してください');
+            return;
+        }
+        
+        auth.signInWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                console.log('ログイン成功:', userCredential.user.email);
+                emailInput.value = '';
+                passwordInput.value = '';
+            })
+            .catch(error => {
+                console.error('ログインエラー:', error);
+                alert(`ログインエラー: ${error.message}`);
+            });
+    });
+    
+    // 新規ユーザー登録
+    signUpBtn.addEventListener('click', function() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!email || !password) {
+            alert('メールアドレスとパスワードを入力してください');
+            return;
+        }
+        
+        if (password.length < 6) {
+            alert('パスワードは6文字以上にしてください');
+            return;
+        }
+        
+        auth.createUserWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                console.log('ユーザー登録成功:', userCredential.user.email);
+                emailInput.value = '';
+                passwordInput.value = '';
+            })
+            .catch(error => {
+                console.error('登録エラー:', error);
+                alert(`登録エラー: ${error.message}`);
+            });
+    });
+    
+    // Googleでログイン
+    googleSignInBtn.addEventListener('click', function() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        auth.signInWithPopup(provider)
+            .then(result => {
+                console.log('Googleログイン成功:', result.user.displayName);
+            })
+            .catch(error => {
+                console.error('Googleログインエラー:', error);
+                alert(`Googleログインエラー: ${error.message}`);
+            });
+    });
+    
+    // ログアウト
+    signOutBtn.addEventListener('click', function() {
+        auth.signOut()
+            .then(() => {
+                console.log('ログアウト成功');
+            })
+            .catch(error => {
+                console.error('ログアウトエラー:', error);
+            });
+    });
+    
     // UI更新（認証状態に応じて）
     function updateUIBasedOnAuth() {
         if (currentUser) {
@@ -58,6 +245,114 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ファイル選択時の処理
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            console.log("File selected:", e.target.files);
+            
+            if (e.target.files && e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                console.log("Selected file:", selectedFile.name);
+                
+                // 分析開始ボタンを有効化（setTimeout で少し遅延させて確実に実行）
+                setTimeout(function() {
+                    if (startAnalysisBtn) {
+                        startAnalysisBtn.disabled = false;
+                        console.log("Start button enabled");
+                    }
+                }, 100);
+                
+                // ファイル名を表示
+                const fileName = document.createElement('p');
+                fileName.textContent = `選択されたファイル: ${selectedFile.name}`;
+                fileName.className = 'selected-file';
+                
+                // 既存のファイル名表示を削除
+                const existingFileName = document.querySelector('.selected-file');
+                if (existingFileName) {
+                    existingFileName.remove();
+                }
+                
+                if (fileInput.parentNode) {
+                    fileInput.parentNode.insertBefore(fileName, startAnalysisBtn);
+                }
+            } else {
+                selectedFile = null;
+                if (startAnalysisBtn) {
+                    startAnalysisBtn.disabled = true;
+                }
+            }
+        });
+    }
+    
+    // 分析開始ボタンクリック時の処理
+    startAnalysisBtn.addEventListener('click', function() {
+        if (!selectedFile) return;
+        
+        // 未ログインの場合はログインを促す
+        if (!currentUser) {
+            alert('データを保存するにはログインしてください');
+            authSection.scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
+        
+        // 読み込み中の表示
+        loadingIndicator.style.display = 'block';
+        analysisContainer.style.display = 'none';
+        
+        // ファイル読み込みと分析を開始
+        const encoding = encodingSelect.value;
+        
+        setTimeout(function() {
+            Papa.parse(selectedFile, {
+                header: true,
+                encoding: encoding,
+                complete: function(results) {
+                    console.log("Parsed data:", results);
+                    allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
+                    
+                    // データをFirebaseに保存
+                    saveCSVToFirebase(selectedFile.name, allData);
+                    
+                    // 以下、既存の処理
+                    // 農場ごとにデータを分割
+                    farm1Data = allData.filter(row => row['農場'] === '花泉1号');
+                    farm2Data = allData.filter(row => row['農場'] === '花泉2号');
+                    
+                    // 初期状態ではフィルターなし
+                    farm1FilteredData = [...farm1Data];
+                    farm2FilteredData = [...farm2Data];
+                    
+                    // 農場1の各種リストを抽出
+                    extractFarm1Lists();
+                    
+                    // 農場2の各種リストを抽出
+                    extractFarm2Lists();
+                    
+                    // フィルターオプションを設定
+                    populateFilterOptions();
+                    
+                    // 読み込み完了、分析結果表示
+                    loadingIndicator.style.display = 'none';
+                    analysisContainer.style.display = 'flex';
+                    
+                    // 両農場の統計を計算・表示
+                    calculateFarm1Stats();
+                    calculateFarm2Stats();
+                    
+                    // フィルターの状態を更新
+                    updateFilterDescription1();
+                    updateFilterDescription2();
+                },
+                error: function(error) {
+                    console.error("Error parsing CSV:", error);
+                    loadingIndicator.style.display = 'none';
+                    alert("CSVファイルの解析中にエラーが発生しました。文字コードを確認してください。");
+                }
+            });
+        }, 500);
+    });
+
     // CSVデータをFirebaseに保存
     function saveCSVToFirebase(fileName, csvData) {
         if (!currentUser) {
@@ -167,9 +462,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-// ページ読み込み時に認証状態を確認
-    updateUIBasedOnAuth();
     
     // 保存済みファイルを読み込む
     function loadSavedFile(fileId) {
@@ -283,300 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }
     }
-    
-    // ユーティリティ関数を最初に定義
-    function sortBoarNames(a, b) {
-        // 特殊ケース: '不明'は常に最後に
-        if (a === '不明') return 1;
-        if (b === '不明') return -1;
-        
-        // アルファベットと数字を分離する正規表現
-        const regExp = /([A-Za-z]+)(\d*)/;
-        
-        const matchA = a.match(regExp);
-        const matchB = b.match(regExp);
-        
-        // マッチしない場合は文字列としてそのまま比較
-        if (!matchA || !matchB) return a.localeCompare(b);
-        
-        const alphaA = matchA[1]; // アルファベット部分
-        const alphaB = matchB[1];
-        
-        // アルファベットが異なる場合はそれで比較
-        if (alphaA !== alphaB) return alphaA.localeCompare(alphaB);
-        
-        // アルファベットが同じ場合は数字部分を数値として比較
-        const numA = matchA[2] ? parseInt(matchA[2], 10) : 0;
-        const numB = matchB[2] ? parseInt(matchB[2], 10) : 0;
-        
-        return numA - numB;
-    }
 
-    // 豚舎名をソートする関数（経産種豚舎 → 育成種豚舎の順）
-function sortBuildingNames(a, b) {
-    // 特殊ケース: '不明'は常に最後に
-    if (a === '不明') return 1;
-    if (b === '不明') return -1;
-    
-    // 経産種豚舎が最初に来るようにする
-    if (a.includes('経産種豚舎') && !b.includes('経産種豚舎')) return -1;
-    if (!a.includes('経産種豚舎') && b.includes('経産種豚舎')) return 1;
-    
-    // どちらも経産か育成の場合は数字で比較
-    if ((a.includes('経産種豚舎') && b.includes('経産種豚舎')) || 
-        (a.includes('育成種豚舎') && b.includes('育成種豚舎'))) {
-        // 数字部分を抽出して比較
-        const numA = parseInt(a.match(/(\d+)/)?.[1] || '0', 10);
-        const numB = parseInt(b.match(/(\d+)/)?.[1] || '0', 10);
-        return numA - numB;
-    }
-    
-    // それ以外は通常の文字列比較
-    return a.localeCompare(b);
-}
-    // DOM要素の参照を取得
-    const fileInput = document.getElementById('csvFile');
-    const encodingSelect = document.getElementById('encoding');
-    const startAnalysisBtn = document.getElementById('start-analysis-btn');
-    const analysisContainer = document.querySelector('.analysis-container');
-    const loadingIndicator = document.getElementById('loading-indicator');
-    
-    // フィルター要素 - 花泉1号
-    const yearFilter1 = document.getElementById('year-filter-1');
-    const monthFilter1 = document.getElementById('month-filter-1');
-    const weekFilter1 = document.getElementById('week-filter-1');
-    const buildingFilter1 = document.getElementById('building-filter-1');
-    const parityFilter1 = document.getElementById('parity-filter-1');
-    const boarFilter1 = document.getElementById('boar-filter-1');
-    const resetFilterBtn1 = document.getElementById('reset-filter-btn-1');
-    const applyFilterBtn1 = document.getElementById('apply-filter-btn-1');
-    const filterDescription1 = document.getElementById('filter-description-1');
-    
-    // フィルター要素 - 花泉2号
-    const yearFilter2 = document.getElementById('year-filter-2');
-    const monthFilter2 = document.getElementById('month-filter-2');
-    const weekFilter2 = document.getElementById('week-filter-2');
-    const buildingFilter2 = document.getElementById('building-filter-2');
-    const parityFilter2 = document.getElementById('parity-filter-2');
-    const boarFilter2 = document.getElementById('boar-filter-2');
-    const resetFilterBtn2 = document.getElementById('reset-filter-btn-2');
-    const applyFilterBtn2 = document.getElementById('apply-filter-btn-2');
-    const filterDescription2 = document.getElementById('filter-description-2');
-    
-    // 結果表示エリア - 花泉1号
-    const overallStats1 = document.getElementById('overall-stats-1');
-    const buildingStats1 = document.getElementById('building-stats-1');
-    const parityStats1 = document.getElementById('parity-stats-1');
-    const boarStats1 = document.getElementById('boar-stats-1');
-    const nonPregnantStats1 = document.getElementById('non-pregnant-stats-1');
-    
-    // 結果表示エリア - 花泉2号
-    const overallStats2 = document.getElementById('overall-stats-2');
-    const buildingStats2 = document.getElementById('building-stats-2');
-    const parityStats2 = document.getElementById('parity-stats-2');
-    const boarStats2 = document.getElementById('boar-stats-2');
-    const nonPregnantStats2 = document.getElementById('non-pregnant-stats-2');
-    
-    let selectedFile = null;
-    let allData = [];
-    let farm1Data = [];
-    let farm2Data = [];
-    let farm1FilteredData = [];
-    let farm2FilteredData = [];
-    
-    // 農場ごとのリスト
-    let farm1YearList = [];
-    let farm1BuildingList = [];
-    let farm1ParityList = [];
-    let farm1BoarList = [];
-    let farm1WeekList = [];
-    
-    let farm2YearList = [];
-    let farm2BuildingList = [];
-    let farm2ParityList = [];
-    let farm2BoarList = [];
-    let farm2WeekList = [];
-    
- // ファイル選択イベントの修正版
-    if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            // メールでサインイン
-    signInBtn.addEventListener('click', function() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        
-        if (!email || !password) {
-            alert('メールアドレスとパスワードを入力してください');
-            return;
-        }
-        
-        auth.signInWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                console.log('ログイン成功:', userCredential.user.email);
-                emailInput.value = '';
-                passwordInput.value = '';
-            })
-            .catch(error => {
-                console.error('ログインエラー:', error);
-                alert(`ログインエラー: ${error.message}`);
-            });
-    });
-    
-    // 新規ユーザー登録
-    signUpBtn.addEventListener('click', function() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        
-        if (!email || !password) {
-            alert('メールアドレスとパスワードを入力してください');
-            return;
-        }
-        
-        if (password.length < 6) {
-            alert('パスワードは6文字以上にしてください');
-            return;
-        }
-        
-        auth.createUserWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                console.log('ユーザー登録成功:', userCredential.user.email);
-                emailInput.value = '';
-                passwordInput.value = '';
-            })
-            .catch(error => {
-                console.error('登録エラー:', error);
-                alert(`登録エラー: ${error.message}`);
-            });
-    });
-    
-    // Googleでログイン
-    googleSignInBtn.addEventListener('click', function() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        
-        auth.signInWithPopup(provider)
-            .then(result => {
-                console.log('Googleログイン成功:', result.user.displayName);
-            })
-            .catch(error => {
-                console.error('Googleログインエラー:', error);
-                alert(`Googleログインエラー: ${error.message}`);
-            });
-    });
-    
-    // ログアウト
-    signOutBtn.addEventListener('click', function() {
-        auth.signOut()
-            .then(() => {
-                console.log('ログアウト成功');
-            })
-            .catch(error => {
-                console.error('ログアウトエラー:', error);
-            });
-    });
-            console.log("File selected:", e.target.files);
-            
-            if (e.target.files && e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                console.log("Selected file:", selectedFile.name);
-                
-                // 分析開始ボタンを有効化（setTimeout で少し遅延させて確実に実行）
-                setTimeout(function() {
-                    if (startAnalysisBtn) {
-                        startAnalysisBtn.disabled = false;
-                        console.log("Start button enabled");
-                    }
-                }, 100);
-                
-                // ファイル名を表示
-                const fileName = document.createElement('p');
-                fileName.textContent = `選択されたファイル: ${selectedFile.name}`;
-                fileName.className = 'selected-file';
-                
-                // 既存のファイル名表示を削除
-                const existingFileName = document.querySelector('.selected-file');
-                if (existingFileName) {
-                    existingFileName.remove();
-                }
-                
-                if (fileInput.parentNode) {
-                    fileInput.parentNode.insertBefore(fileName, startAnalysisBtn);
-                }
-            } else {
-                selectedFile = null;
-                if (startAnalysisBtn) {
-                    startAnalysisBtn.disabled = true;
-                }
-            }
-        });
-    }
-    
-    // 分析開始ボタンクリック時の処理
-    startAnalysisBtn.addEventListener('click', function() {
-        if (!selectedFile) return;
-        
-        // 未ログインの場合はログインを促す
-        if (!currentUser) {
-            alert('データを保存するにはログインしてください');
-            authSection.scrollIntoView({ behavior: 'smooth' });
-            return;
-        }
-        
-        // 読み込み中の表示
-        loadingIndicator.style.display = 'block';
-        analysisContainer.style.display = 'none';
-        
-        // ファイル読み込みと分析を開始
-        const encoding = encodingSelect.value;
-        
-        setTimeout(function() {
-            Papa.parse(selectedFile, {
-                header: true,
-                encoding: encoding,
-                complete: function(results) {
-                    console.log("Parsed data:", results);
-                    allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
-                    
-                    // データをFirebaseに保存
-                    saveCSVToFirebase(selectedFile.name, allData);
-                    
-                    // 以下、既存の処理
-                    // 農場ごとにデータを分割
-                    farm1Data = allData.filter(row => row['農場'] === '花泉1号');
-                    farm2Data = allData.filter(row => row['農場'] === '花泉2号');
-                    
-                    // 初期状態ではフィルターなし
-                    farm1FilteredData = [...farm1Data];
-                    farm2FilteredData = [...farm2Data];
-                    
-                    // 農場1の各種リストを抽出
-                    extractFarm1Lists();
-                    
-                    // 農場2の各種リストを抽出
-                    extractFarm2Lists();
-                    
-                    // フィルターオプションを設定
-                    populateFilterOptions();
-                    
-                    // 読み込み完了、分析結果表示
-                    loadingIndicator.style.display = 'none';
-                    analysisContainer.style.display = 'flex';
-                    
-                    // 両農場の統計を計算・表示
-                    calculateFarm1Stats();
-                    calculateFarm2Stats();
-                    
-                    // フィルターの状態を更新
-                    updateFilterDescription1();
-                    updateFilterDescription2();
-                },
-                error: function(error) {
-                    console.error("Error parsing CSV:", error);
-                    loadingIndicator.style.display = 'none';
-                    alert("CSVファイルの解析中にエラーが発生しました。文字コードを確認してください。");
-                }
-            });
-        }, 500);
-    });
     // 農場1の各種リストを抽出
     function extractFarm1Lists() {
         // 年リスト抽出
@@ -1094,7 +1093,7 @@ function sortBuildingNames(a, b) {
         calculateFarm2NonPregnantStats();
     }
 
-    // 花泉1号の全体統計
+  // 花泉1号の全体統計
     function calculateFarm1OverallStats() {
         const total = farm1FilteredData.length;
         const pregnant = farm1FilteredData.filter(row => {
@@ -1123,78 +1122,78 @@ function sortBuildingNames(a, b) {
         }
     }
     
-   // 花泉1号の豚舎別統計
-function calculateFarm1BuildingStats() {
-    const buildingData = {};
-    
-    farm1FilteredData.forEach(row => {
-        const building = row['豚舎'] || '不明';
-        if (!buildingData[building]) {
-            buildingData[building] = { total: 0, pregnant: 0 };
-        }
+    // 花泉1号の豚舎別統計
+    function calculateFarm1BuildingStats() {
+        const buildingData = {};
         
-        buildingData[building].total++;
-        const result = (row['妊娠鑑定結果'] || '').trim();
-        if (result === '受胎確定') {
-            buildingData[building].pregnant++;
-        }
-    });
-    
-    // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
-    const sortedBuildingData = {};
-    Object.keys(buildingData)
-        .sort(sortBuildingNames)
-        .forEach(building => {
-            sortedBuildingData[building] = buildingData[building];
+        farm1FilteredData.forEach(row => {
+            const building = row['豚舎'] || '不明';
+            if (!buildingData[building]) {
+                buildingData[building] = { total: 0, pregnant: 0 };
+            }
+            
+            buildingData[building].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                buildingData[building].pregnant++;
+            }
         });
-    
-    // HTML生成
-    let html = `
-        <h3>豚舎別受胎率</h3>
-        <table class="data-table">
-            <tr>
-                <th>豚舎</th>
-                <th>総数</th>
-                <th>受胎数</th>
-                <th>受胎率</th>
-            </tr>
-    `;
-    
-    // 全体の集計
-    let totalAll = 0;
-    let pregnantAll = 0;
-    
-    for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
-        const rate = sortedBuildingData[building].total > 0 ? 
-            (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
         
-        html += `
-            <tr>
-                <td>${building}</td>
-                <td>${sortedBuildingData[building].total}</td>
-                <td>${sortedBuildingData[building].pregnant}</td>
-                <td>${rate}%</td>
-            </tr>
+        // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
+        const sortedBuildingData = {};
+        Object.keys(buildingData)
+            .sort(sortBuildingNames)
+            .forEach(building => {
+                sortedBuildingData[building] = buildingData[building];
+            });
+        
+        // HTML生成
+        let html = `
+            <h3>豚舎別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>豚舎</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
         `;
         
-        totalAll += sortedBuildingData[building].total;
-        pregnantAll += sortedBuildingData[building].pregnant;
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
+            const rate = sortedBuildingData[building].total > 0 ? 
+                (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
+            
+            html += `
+                <tr>
+                    <td>${building}</td>
+                    <td>${sortedBuildingData[building].total}</td>
+                    <td>${sortedBuildingData[building].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += sortedBuildingData[building].total;
+            pregnantAll += sortedBuildingData[building].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        html += `</table>`;
+        html += `<div class="chart-container" id="building-chart-1"></div>`;
+        
+        buildingStats1.innerHTML = html;
+        
+        // 円グラフ
+        if (totalAll > 0) {
+            createDataDistributionPieChart('building-chart-1', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
+        }
     }
-    
-    // 合計行
-    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-    
-    html += `</table>`;
-    html += `<div class="chart-container" id="building-chart-1"></div>`;
-    
-    buildingStats1.innerHTML = html;
-    
-    // 円グラフ
-    if (totalAll > 0) {
-        createDataDistributionPieChart('building-chart-1', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
-    }
-}
     
     // 花泉1号の産次別統計
     function calculateFarm1ParityStats() {
@@ -1277,84 +1276,84 @@ function calculateFarm1BuildingStats() {
     }
     
     // 花泉1号の雄豚・精液別統計
-function calculateFarm1BoarStats() {
-    const boarData = {};
-    
-    farm1FilteredData.forEach(row => {
-        const boar = row['雄豚・精液・あて雄'] || '不明';
-        if (!boarData[boar]) {
-            boarData[boar] = { total: 0, pregnant: 0 };
-        }
+    function calculateFarm1BoarStats() {
+        const boarData = {};
         
-        boarData[boar].total++;
-        const result = (row['妊娠鑑定結果'] || '').trim();
-        if (result === '受胎確定') {
-            boarData[boar].pregnant++;
-        }
-    });
-    
-    // 雄豚をアルファベット順→数字順にソート
-    const sortedBoarData = {};
-    Object.keys(boarData)
-        .sort(sortBoarNames)
-        .forEach(boar => {
-            sortedBoarData[boar] = boarData[boar];
+        farm1FilteredData.forEach(row => {
+            const boar = row['雄豚・精液・あて雄'] || '不明';
+            if (!boarData[boar]) {
+                boarData[boar] = { total: 0, pregnant: 0 };
+            }
+            
+            boarData[boar].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                boarData[boar].pregnant++;
+            }
         });
-    
-    // HTML生成
-    let html = `
-        <h3>雄豚・精液別受胎率</h3>
-        <table class="data-table">
-            <tr>
-                <th>雄豚・精液</th>
-                <th>総数</th>
-                <th>受胎数</th>
-                <th>受胎率</th>
-            </tr>
-    `;
-    
-    // 全体の集計
-    let totalAll = 0;
-    let pregnantAll = 0;
-    
-    for (const boar in sortedBoarData) {  // sortedBoarDataを使用
-        const rate = sortedBoarData[boar].total > 0 ? 
-            (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
         
-        html += `
-            <tr>
-                <td>${boar}</td>
-                <td>${sortedBoarData[boar].total}</td>
-                <td>${sortedBoarData[boar].pregnant}</td>
-                <td>${rate}%</td>
-            </tr>
+        // 雄豚をアルファベット順→数字順にソート
+        const sortedBoarData = {};
+        Object.keys(boarData)
+            .sort(sortBoarNames)
+            .forEach(boar => {
+                sortedBoarData[boar] = boarData[boar];
+            });
+        
+        // HTML生成
+        let html = `
+            <h3>雄豚・精液別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>雄豚・精液</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
         `;
         
-        totalAll += sortedBoarData[boar].total;
-        pregnantAll += sortedBoarData[boar].pregnant;
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const boar in sortedBoarData) {  // sortedBoarDataを使用
+            const rate = sortedBoarData[boar].total > 0 ? 
+                (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
+            
+            html += `
+                <tr>
+                    <td>${boar}</td>
+                    <td>${sortedBoarData[boar].total}</td>
+                    <td>${sortedBoarData[boar].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += sortedBoarData[boar].total;
+            pregnantAll += sortedBoarData[boar].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        html += `</table>`;
+        html += `<div class="chart-container" id="boar-chart-1"></div>`;
+        
+        boarStats1.innerHTML = html;
+        
+        // 円グラフ
+        if (totalAll > 0) {
+            createDataDistributionPieChart('boar-chart-1', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
+        }
     }
-    
-    // 合計行
-    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-    
-    html += `</table>`;
-    html += `<div class="chart-container" id="boar-chart-1"></div>`;
-    
-    boarStats1.innerHTML = html;
-    
-    // 円グラフ
-    if (totalAll > 0) {
-        createDataDistributionPieChart('boar-chart-1', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
-    }
-}
     
     // 花泉1号の不受胎母豚一覧
     function calculateFarm1NonPregnantStats() {
         // 不受胎データをフィルタリング
         const nonPregnantData = farm1FilteredData.filter(row => {
-    const result = (row['妊娠鑑定結果'] || '').trim();
-    return result !== '受胎確定';  // 空白チェックの条件（&& result !== ''）を削除
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            return result !== '受胎確定';  // 空白チェックの条件を削除
         });
         
         // テーブル生成
@@ -1443,78 +1442,78 @@ function calculateFarm1BoarStats() {
         }
     }
     
-   // 花泉2号の豚舎別統計
-function calculateFarm2BuildingStats() {
-    const buildingData = {};
-    
-    farm2FilteredData.forEach(row => {
-        const building = row['豚舎'] || '不明';
-        if (!buildingData[building]) {
-            buildingData[building] = { total: 0, pregnant: 0 };
-        }
+    // 花泉2号の豚舎別統計
+    function calculateFarm2BuildingStats() {
+        const buildingData = {};
         
-        buildingData[building].total++;
-        const result = (row['妊娠鑑定結果'] || '').trim();
-        if (result === '受胎確定') {
-            buildingData[building].pregnant++;
-        }
-    });
-    
-    // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
-    const sortedBuildingData = {};
-    Object.keys(buildingData)
-        .sort(sortBuildingNames)
-        .forEach(building => {
-            sortedBuildingData[building] = buildingData[building];
+        farm2FilteredData.forEach(row => {
+            const building = row['豚舎'] || '不明';
+            if (!buildingData[building]) {
+                buildingData[building] = { total: 0, pregnant: 0 };
+            }
+            
+            buildingData[building].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                buildingData[building].pregnant++;
+            }
         });
-    
-    // HTML生成
-    let html = `
-        <h3>豚舎別受胎率</h3>
-        <table class="data-table">
-            <tr>
-                <th>豚舎</th>
-                <th>総数</th>
-                <th>受胎数</th>
-                <th>受胎率</th>
-            </tr>
-    `;
-    
-    // 全体の集計
-    let totalAll = 0;
-    let pregnantAll = 0;
-    
-    for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
-        const rate = sortedBuildingData[building].total > 0 ? 
-            (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
         
-        html += `
-            <tr>
-                <td>${building}</td>
-                <td>${sortedBuildingData[building].total}</td>
-                <td>${sortedBuildingData[building].pregnant}</td>
-                <td>${rate}%</td>
-            </tr>
+        // 豚舎をソート（経産種豚舎 → 育成種豚舎の順）
+        const sortedBuildingData = {};
+        Object.keys(buildingData)
+            .sort(sortBuildingNames)
+            .forEach(building => {
+                sortedBuildingData[building] = buildingData[building];
+            });
+        
+        // HTML生成
+        let html = `
+            <h3>豚舎別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>豚舎</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
         `;
         
-        totalAll += sortedBuildingData[building].total;
-        pregnantAll += sortedBuildingData[building].pregnant;
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const building in sortedBuildingData) {  // sortedBuildingDataを使用
+            const rate = sortedBuildingData[building].total > 0 ? 
+                (sortedBuildingData[building].pregnant / sortedBuildingData[building].total * 100).toFixed(2) : 0;
+            
+            html += `
+                <tr>
+                    <td>${building}</td>
+                    <td>${sortedBuildingData[building].total}</td>
+                    <td>${sortedBuildingData[building].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += sortedBuildingData[building].total;
+            pregnantAll += sortedBuildingData[building].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        html += `</table>`;
+        html += `<div class="chart-container" id="building-chart-2"></div>`;
+        
+        buildingStats2.innerHTML = html;
+        
+        // 円グラフ
+        if (totalAll > 0) {
+            createDataDistributionPieChart('building-chart-2', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
+        }
     }
-    
-    // 合計行
-    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-    
-    html += `</table>`;
-    html += `<div class="chart-container" id="building-chart-2"></div>`;
-    
-    buildingStats2.innerHTML = html;
-    
-    // 円グラフ
-    if (totalAll > 0) {
-        createDataDistributionPieChart('building-chart-2', '豚舎別データ分布', sortedBuildingData);  // sortedBuildingDataを使用
-    }
-}
     
     // 花泉2号の産次別統計
     function calculateFarm2ParityStats() {
@@ -1597,85 +1596,85 @@ function calculateFarm2BuildingStats() {
     }
     
     // 花泉2号の雄豚・精液別統計
-function calculateFarm2BoarStats() {
-    const boarData = {};
-    
-    farm2FilteredData.forEach(row => {
-        const boar = row['雄豚・精液・あて雄'] || '不明';
-        if (!boarData[boar]) {
-            boarData[boar] = { total: 0, pregnant: 0 };
-        }
+    function calculateFarm2BoarStats() {
+        const boarData = {};
         
-        boarData[boar].total++;
-        const result = (row['妊娠鑑定結果'] || '').trim();
-        if (result === '受胎確定') {
-            boarData[boar].pregnant++;
-        }
-    });
-    
-    // 雄豚をアルファベット順→数字順にソート
-    const sortedBoarData = {};
-    Object.keys(boarData)
-        .sort(sortBoarNames)
-        .forEach(boar => {
-            sortedBoarData[boar] = boarData[boar];
+        farm2FilteredData.forEach(row => {
+            const boar = row['雄豚・精液・あて雄'] || '不明';
+            if (!boarData[boar]) {
+                boarData[boar] = { total: 0, pregnant: 0 };
+            }
+            
+            boarData[boar].total++;
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            if (result === '受胎確定') {
+                boarData[boar].pregnant++;
+            }
         });
-    
-    // HTML生成
-    let html = `
-        <h3>雄豚・精液別受胎率</h3>
-        <table class="data-table">
-            <tr>
-                <th>雄豚・精液</th>
-                <th>総数</th>
-                <th>受胎数</th>
-                <th>受胎率</th>
-            </tr>
-    `;
-    
-    // 全体の集計
-    let totalAll = 0;
-    let pregnantAll = 0;
-    
-    for (const boar in sortedBoarData) {  // sortedBoarDataを使用
-        const rate = sortedBoarData[boar].total > 0 ? 
-            (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
         
-        html += `
-            <tr>
-                <td>${boar}</td>
-                <td>${sortedBoarData[boar].total}</td>
-                <td>${sortedBoarData[boar].pregnant}</td>
-                <td>${rate}%</td>
-            </tr>
+        // 雄豚をアルファベット順→数字順にソート
+        const sortedBoarData = {};
+        Object.keys(boarData)
+            .sort(sortBoarNames)
+            .forEach(boar => {
+                sortedBoarData[boar] = boarData[boar];
+            });
+        
+        // HTML生成
+        let html = `
+            <h3>雄豚・精液別受胎率</h3>
+            <table class="data-table">
+                <tr>
+                    <th>雄豚・精液</th>
+                    <th>総数</th>
+                    <th>受胎数</th>
+                    <th>受胎率</th>
+                </tr>
         `;
         
-        totalAll += sortedBoarData[boar].total;
-        pregnantAll += sortedBoarData[boar].pregnant;
+        // 全体の集計
+        let totalAll = 0;
+        let pregnantAll = 0;
+        
+        for (const boar in sortedBoarData) {  // sortedBoarDataを使用
+            const rate = sortedBoarData[boar].total > 0 ? 
+                (sortedBoarData[boar].pregnant / sortedBoarData[boar].total * 100).toFixed(2) : 0;
+            
+            html += `
+                <tr>
+                    <td>${boar}</td>
+                    <td>${sortedBoarData[boar].total}</td>
+                    <td>${sortedBoarData[boar].pregnant}</td>
+                    <td>${rate}%</td>
+                </tr>
+            `;
+            
+            totalAll += sortedBoarData[boar].total;
+            pregnantAll += sortedBoarData[boar].pregnant;
+        }
+        
+        // 合計行
+        const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
+        html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
+        
+        html += `</table>`;
+        html += `<div class="chart-container" id="boar-chart-2"></div>`;
+        
+        boarStats2.innerHTML = html;
+        
+        // 円グラフ
+        if (totalAll > 0) {
+            createDataDistributionPieChart('boar-chart-2', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
+        }
     }
-    
-    // 合計行
-    const totalRate = totalAll > 0 ? (pregnantAll / totalAll * 100).toFixed(2) : 0;
-    html += `<tr class="total-row"><td>合計</td><td>${totalAll}</td><td>${pregnantAll}</td><td>${totalRate}%</td></tr>`;
-    
-    html += `</table>`;
-    html += `<div class="chart-container" id="boar-chart-2"></div>`;
-    
-    boarStats2.innerHTML = html;
-    
-    // 円グラフ
-    if (totalAll > 0) {
-        createDataDistributionPieChart('boar-chart-2', '雄豚・精液別データ分布', sortedBoarData);  // sortedBoarDataを使用
-    }
-}
     
     // 花泉2号の不受胎母豚一覧
     function calculateFarm2NonPregnantStats() {
-       // 不受胎データをフィルタリング
-const nonPregnantData = farm2FilteredData.filter(row => {
-    const result = (row['妊娠鑑定結果'] || '').trim();
-    return result !== '受胎確定';  // 空白チェックの条件（&& result !== ''）を削除
-});
+        // 不受胎データをフィルタリング
+        const nonPregnantData = farm2FilteredData.filter(row => {
+            const result = (row['妊娠鑑定結果'] || '').trim();
+            return result !== '受胎確定';  // 空白チェックの条件を削除
+        });
         
         // テーブル生成
         let html = `
@@ -1836,4 +1835,7 @@ const nonPregnantData = farm2FilteredData.filter(row => {
             }
         });
     }
+    
+    // ページ読み込み時に認証状態を確認
+    updateUIBasedOnAuth();
 });
