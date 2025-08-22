@@ -1,4 +1,289 @@
+// Firebaseの設定
+const firebaseConfig = {
+  apiKey: "AIzaSyAnnxQRTEhZkgYn58FiKq9FpHUx3hOxPnU",
+  authDomain: "pig-fertility-analyzer.firebaseapp.com",
+  projectId: "pig-fertility-analyzer",
+  storageBucket: "pig-fertility-analyzer.firebasestorage.app",
+  messagingSenderId: "246286434358",
+  appId: "1:246286434358:web:f37be99c02854fcef2d897"
+};
+
+// Firebase初期化
+firebase.initializeApp(firebaseConfig);
+
+// Firebase各サービスへの参照
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Firebase認証関連の要素
+    const authSection = document.getElementById('authSection');
+    const userSection = document.getElementById('userSection');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const signInBtn = document.getElementById('signInBtn');
+    const signUpBtn = document.getElementById('signUpBtn');
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const userEmail = document.getElementById('userEmail');
+    const savedFilesSection = document.querySelector('.saved-files-section');
+    const savedFilesList = document.querySelector('.saved-files-list');
+    
+    // 認証状態監視
+    let currentUser = null;
+    auth.onAuthStateChanged(user => {
+        currentUser = user;
+        updateUIBasedOnAuth();
+        
+        if (user) {
+            // ログイン済みなら保存ファイル一覧を読み込む
+            loadSavedFilesList();
+        }
+    });
+
+    // UI更新（認証状態に応じて）
+    function updateUIBasedOnAuth() {
+        if (currentUser) {
+            // ログイン済み
+            authSection.style.display = 'none';
+            userSection.style.display = 'block';
+            userEmail.textContent = currentUser.email || currentUser.displayName || currentUser.uid;
+        } else {
+            // 未ログイン
+            authSection.style.display = 'block';
+            userSection.style.display = 'none';
+            savedFilesSection.style.display = 'none';
+        }
+    }
+    
+    // CSVデータをFirebaseに保存
+    function saveCSVToFirebase(fileName, csvData) {
+        if (!currentUser) {
+            alert('保存するにはログインしてください');
+            return;
+        }
+        
+        // 保存日時
+        const saveDate = new Date().toISOString();
+        
+        // メタデータをFirestoreに保存
+        db.collection('users').doc(currentUser.uid).collection('csvFiles').add({
+            fileName: fileName,
+            saveDate: saveDate,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        })
+        .then(docRef => {
+            // ファイルIDを取得
+            const fileId = docRef.id;
+            
+            // CSVデータをJSON文字列化
+            const jsonData = JSON.stringify(csvData);
+            
+            // Storageにデータを保存
+            const storagePath = `users/${currentUser.uid}/csvFiles/${fileId}.json`;
+            const storageRef = storage.ref(storagePath);
+            
+            return storageRef.putString(jsonData, 'raw')
+                .then(() => {
+                    console.log(`ファイル「${fileName}」を保存しました`);
+                    // 保存済みファイル一覧を更新
+                    loadSavedFilesList();
+                    return fileId;
+                });
+        })
+        .catch(error => {
+            console.error('保存エラー:', error);
+            alert('ファイルの保存に失敗しました');
+        });
+    }
+    
+    // 保存済みファイル一覧を取得して表示
+    function loadSavedFilesList() {
+        if (!currentUser) return;
+        
+        savedFilesList.innerHTML = '<p>読み込み中...</p>';
+        
+        db.collection('users').doc(currentUser.uid).collection('csvFiles')
+            .orderBy('createdAt', 'desc')
+            .get()
+            .then(snapshot => {
+                if (snapshot.empty) {
+                    savedFilesSection.style.display = 'none';
+                    return;
+                }
+                
+                savedFilesSection.style.display = 'block';
+                savedFilesList.innerHTML = '';
+                
+                snapshot.forEach(doc => {
+                    const fileData = doc.data();
+                    const fileId = doc.id;
+                    
+                    const fileDate = fileData.saveDate ? new Date(fileData.saveDate) : new Date();
+                    const formattedDate = `${fileDate.getFullYear()}/${fileDate.getMonth()+1}/${fileDate.getDate()} ${fileDate.getHours()}:${String(fileDate.getMinutes()).padStart(2, '0')}`;
+                    
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'saved-file-item';
+                    fileItem.innerHTML = `
+                        <div class="saved-file-info">
+                            <div class="saved-file-name">${fileData.fileName}</div>
+                            <div class="saved-file-date">保存日時: ${formattedDate}</div>
+                        </div>
+                        <div class="saved-file-actions">
+                            <button class="load-file-btn" data-id="${fileId}">読み込み</button>
+                            <button class="delete-file-btn" data-id="${fileId}">削除</button>
+                        </div>
+                    `;
+                    
+                    savedFilesList.appendChild(fileItem);
+                });
+                
+                // イベントリスナーの設定
+                setupFileActionListeners();
+            })
+            .catch(error => {
+                console.error('ファイル一覧取得エラー:', error);
+                savedFilesList.innerHTML = '<p>ファイル一覧の取得に失敗しました</p>';
+            });
+    }
+    
+    // ファイルアクションのイベントリスナー設定
+    function setupFileActionListeners() {
+        // 読み込みボタンのイベントリスナー
+        document.querySelectorAll('.load-file-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const fileId = this.getAttribute('data-id');
+                loadSavedFile(fileId);
+            });
+        });
+        
+        // 削除ボタンのイベントリスナー
+        document.querySelectorAll('.delete-file-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const fileId = this.getAttribute('data-id');
+                deleteSavedFile(fileId);
+            });
+        });
+    }
+
+// ページ読み込み時に認証状態を確認
+    updateUIBasedOnAuth();
+    
+    // 保存済みファイルを読み込む
+    function loadSavedFile(fileId) {
+        if (!currentUser) return;
+        
+        // メタデータをFirestoreから取得
+        db.collection('users').doc(currentUser.uid).collection('csvFiles').doc(fileId)
+            .get()
+            .then(doc => {
+                if (!doc.exists) {
+                    throw new Error('ファイルが見つかりません');
+                }
+                
+                const fileData = doc.data();
+                
+                // StorageからJSONデータを取得
+                const storagePath = `users/${currentUser.uid}/csvFiles/${fileId}.json`;
+                const storageRef = storage.ref(storagePath);
+                
+                return storageRef.getDownloadURL()
+                    .then(url => {
+                        // URLからデータを取得
+                        return fetch(url)
+                            .then(response => response.text())
+                            .then(jsonText => {
+                                // JSON文字列をパース
+                                const csvData = JSON.parse(jsonText);
+                                
+                                // 読み込み中の表示
+                                loadingIndicator.style.display = 'block';
+                                analysisContainer.style.display = 'none';
+                                
+                                // データ処理・分析実行
+                                setTimeout(function() {
+                                    // データを設定
+                                    allData = csvData;
+                                    
+                                    // 農場ごとにデータを分割
+                                    farm1Data = allData.filter(row => row['農場'] === '花泉1号');
+                                    farm2Data = allData.filter(row => row['農場'] === '花泉2号');
+                                    
+                                    // 初期状態ではフィルターなし
+                                    farm1FilteredData = [...farm1Data];
+                                    farm2FilteredData = [...farm2Data];
+                                    
+                                    // 各種リストを抽出
+                                    extractFarm1Lists();
+                                    extractFarm2Lists();
+                                    
+                                    // フィルターオプションを設定
+                                    populateFilterOptions();
+                                    
+                                    // 分析結果表示
+                                    loadingIndicator.style.display = 'none';
+                                    analysisContainer.style.display = 'flex';
+                                    
+                                    // 統計計算・表示
+                                    calculateFarm1Stats();
+                                    calculateFarm2Stats();
+                                    
+                                    // フィルターの状態を更新
+                                    updateFilterDescription1();
+                                    updateFilterDescription2();
+                                    
+                                    // ファイル名表示
+                                    const fileName = document.createElement('p');
+                                    fileName.textContent = `読み込んだファイル: ${fileData.fileName}`;
+                                    fileName.className = 'selected-file';
+                                    
+                                    // 既存のファイル名表示を削除
+                                    const existingFileName = document.querySelector('.selected-file');
+                                    if (existingFileName) {
+                                        existingFileName.remove();
+                                    }
+                                    
+                                    fileInput.parentNode.insertBefore(fileName, startAnalysisBtn);
+                                }, 500);
+                            });
+                    });
+            })
+            .catch(error => {
+                console.error('ファイル読み込みエラー:', error);
+                alert('ファイルの読み込みに失敗しました');
+                loadingIndicator.style.display = 'none';
+            });
+    }
+    
+    // 保存済みファイルを削除
+    function deleteSavedFile(fileId) {
+        if (!currentUser) return;
+        
+        if (confirm('このファイルを削除してもよろしいですか？')) {
+            // Firestoreからメタデータを削除
+            db.collection('users').doc(currentUser.uid).collection('csvFiles').doc(fileId)
+                .delete()
+                .then(() => {
+                    // Storageからファイルを削除
+                    const storagePath = `users/${currentUser.uid}/csvFiles/${fileId}.json`;
+                    const storageRef = storage.ref(storagePath);
+                    
+                    return storageRef.delete()
+                        .then(() => {
+                            alert('ファイルを削除しました');
+                            // 保存済みファイル一覧を更新
+                            loadSavedFilesList();
+                        });
+                })
+                .catch(error => {
+                    console.error('ファイル削除エラー:', error);
+                    alert('ファイルの削除に失敗しました');
+                });
+        }
+    }
+    
     // ユーティリティ関数を最初に定義
     function sortBoarNames(a, b) {
         // 特殊ケース: '不明'は常に最後に
@@ -115,6 +400,79 @@ function sortBuildingNames(a, b) {
  // ファイル選択イベントの修正版
     if (fileInput) {
         fileInput.addEventListener('change', function(e) {
+            // メールでサインイン
+    signInBtn.addEventListener('click', function() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!email || !password) {
+            alert('メールアドレスとパスワードを入力してください');
+            return;
+        }
+        
+        auth.signInWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                console.log('ログイン成功:', userCredential.user.email);
+                emailInput.value = '';
+                passwordInput.value = '';
+            })
+            .catch(error => {
+                console.error('ログインエラー:', error);
+                alert(`ログインエラー: ${error.message}`);
+            });
+    });
+    
+    // 新規ユーザー登録
+    signUpBtn.addEventListener('click', function() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!email || !password) {
+            alert('メールアドレスとパスワードを入力してください');
+            return;
+        }
+        
+        if (password.length < 6) {
+            alert('パスワードは6文字以上にしてください');
+            return;
+        }
+        
+        auth.createUserWithEmailAndPassword(email, password)
+            .then(userCredential => {
+                console.log('ユーザー登録成功:', userCredential.user.email);
+                emailInput.value = '';
+                passwordInput.value = '';
+            })
+            .catch(error => {
+                console.error('登録エラー:', error);
+                alert(`登録エラー: ${error.message}`);
+            });
+    });
+    
+    // Googleでログイン
+    googleSignInBtn.addEventListener('click', function() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        auth.signInWithPopup(provider)
+            .then(result => {
+                console.log('Googleログイン成功:', result.user.displayName);
+            })
+            .catch(error => {
+                console.error('Googleログインエラー:', error);
+                alert(`Googleログインエラー: ${error.message}`);
+            });
+    });
+    
+    // ログアウト
+    signOutBtn.addEventListener('click', function() {
+        auth.signOut()
+            .then(() => {
+                console.log('ログアウト成功');
+            })
+            .catch(error => {
+                console.error('ログアウトエラー:', error);
+            });
+    });
             console.log("File selected:", e.target.files);
             
             if (e.target.files && e.target.files.length > 0) {
@@ -156,6 +514,13 @@ function sortBuildingNames(a, b) {
     startAnalysisBtn.addEventListener('click', function() {
         if (!selectedFile) return;
         
+        // 未ログインの場合はログインを促す
+        if (!currentUser) {
+            alert('データを保存するにはログインしてください');
+            authSection.scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
+        
         // 読み込み中の表示
         loadingIndicator.style.display = 'block';
         analysisContainer.style.display = 'none';
@@ -171,6 +536,10 @@ function sortBuildingNames(a, b) {
                     console.log("Parsed data:", results);
                     allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
                     
+                    // データをFirebaseに保存
+                    saveCSVToFirebase(selectedFile.name, allData);
+                    
+                    // 以下、既存の処理
                     // 農場ごとにデータを分割
                     farm1Data = allData.filter(row => row['農場'] === '花泉1号');
                     farm2Data = allData.filter(row => row['農場'] === '花泉2号');
@@ -208,7 +577,6 @@ function sortBuildingNames(a, b) {
             });
         }, 500);
     });
-
     // 農場1の各種リストを抽出
     function extractFarm1Lists() {
         // 年リスト抽出
