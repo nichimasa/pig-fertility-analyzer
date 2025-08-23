@@ -311,8 +311,46 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log("Parsed data:", results);
                     allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
                     
-                    // データをFirebaseに保存
-                    saveCSVToFirebase(selectedFile.name, allData);
+                    // CSVデータをFirebaseに保存
+function saveCSVToFirebase(fileName, csvData) {
+    if (!currentUser) {
+        alert('保存するにはログインしてください');
+        return;
+    }
+    
+    // 保存日時
+    const saveDate = new Date().toISOString();
+    
+    // メタデータをFirestoreに保存
+    db.collection('users').doc(currentUser.uid).collection('csvFiles').add({
+        fileName: fileName,
+        saveDate: saveDate,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(docRef => {
+        // ファイルIDを取得
+        const fileId = docRef.id;
+        
+        // CSVデータをJSON文字列化
+        const jsonData = JSON.stringify(csvData);
+        
+        // Storageにデータを保存
+        const storagePath = `users/${currentUser.uid}/csvFiles/${fileId}.json`;
+        const storageRef = storage.ref(storagePath);
+        
+        return storageRef.putString(jsonData, 'raw')
+            .then(() => {
+                console.log(`ファイル「${fileName}」を保存しました`);
+                // 保存済みファイル一覧を更新
+                loadSavedFilesList();
+                return fileId;
+            });
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('ファイルの保存に失敗しました');
+    });
+}
                     
                     // 以下、既存の処理
                     // 農場ごとにデータを分割
