@@ -11,16 +11,6 @@ const firebaseConfig = {
 // Firebase初期化
 firebase.initializeApp(firebaseConfig);
 
-// Firebaseの設定
-const firebaseConfig = {
-  apiKey: "AIzaSyAnnxQRTEhZkgYn58FiKq9FpHUx3hOxPnU",
-  authDomain: "pig-fertility-analyzer.firebaseapp.com",
-  projectId: "pig-fertility-analyzer",
-  storageBucket: "pig-fertility-analyzer.firebasestorage.app",
-  messagingSenderId: "246286434358",
-  appId: "1:246286434358:web:f37be99c02854fcef2d897"
-};
-
 // Firebase各サービスへの参照
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -185,6 +175,34 @@ function updateUIBasedOnAuth() {
         authSection.style.display = 'none';
         userSection.style.display = 'block';
         userEmail.textContent = currentUser.email || currentUser.displayName || currentUser.uid;
+    } else {
+        // 未ログイン
+        authSection.style.display = 'block';
+        userSection.style.display = 'none';
+        if (savedFilesSection) {
+            savedFilesSection.style.display = 'none';
+        }
+    }
+}// UI更新（認証状態に応じて）
+function updateUIBasedOnAuth() {
+    // 必要な要素の存在チェック
+    const authSection = document.getElementById('authSection');
+    const userSection = document.getElementById('userSection');
+    const userEmail = document.getElementById('userEmail');
+    const savedFilesSection = document.querySelector('.saved-files-section');
+    
+    if (!authSection || !userSection) {
+        console.log("UI要素が見つかりません");
+        return; // UI要素が見つからない場合は処理を中断
+    }
+    
+    if (currentUser) {
+        // ログイン済み
+        authSection.style.display = 'none';
+        userSection.style.display = 'block';
+        if (userEmail) {
+            userEmail.textContent = currentUser.email || currentUser.displayName || currentUser.uid;
+        }
     } else {
         // 未ログイン
         authSection.style.display = 'block';
