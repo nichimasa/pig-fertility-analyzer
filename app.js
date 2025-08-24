@@ -11,10 +11,23 @@ const firebaseConfig = {
 // Firebase初期化
 firebase.initializeApp(firebaseConfig);
 
+// Firebaseの設定
+const firebaseConfig = {
+  apiKey: "AIzaSyAnnxQRTEhZkgYn58FiKq9FpHUx3hOxPnU",
+  authDomain: "pig-fertility-analyzer.firebaseapp.com",
+  projectId: "pig-fertility-analyzer",
+  storageBucket: "pig-fertility-analyzer.firebasestorage.app",
+  messagingSenderId: "246286434358",
+  appId: "1:246286434358:web:f37be99c02854fcef2d897"
+};
+
 // Firebase各サービスへの参照
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+
+// グローバル変数の定義
+let currentUser = null; 
 
 document.addEventListener('DOMContentLoaded', function() {
     // Firebase認証関連の要素
@@ -144,22 +157,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return a.localeCompare(b);
     }
     
-   // 認証状態監視 (app.jsの初期部分で)
-auth.onAuthStateChanged(function(user) {
-    currentUser = user;
+  // 認証状態監視
+auth.onAuthStateChanged(user => {
     console.log("認証状態変更:", user ? "ログイン中" : "未ログイン");
+    currentUser = user;
     
-    // UI更新
     updateUIBasedOnAuth();
     
-    // ログイン済みなら保存ファイル一覧を読み込む
     if (user) {
         console.log("ユーザーID:", user.uid);
-        setTimeout(() => { 
+        // 保存済みファイル一覧を読み込む
+        setTimeout(() => {
             loadSavedFilesList();
         }, 1000);
     }
 });
+    
+   // UI更新（認証状態に応じて）
+function updateUIBasedOnAuth() {
+    if (!authSection || !userSection) {
+        console.log("UI要素が見つかりません");
+        return; // UI要素が見つからない場合は処理を中断
+    }
+    
+    if (currentUser) {
+        // ログイン済み
+        authSection.style.display = 'none';
+        userSection.style.display = 'block';
+        userEmail.textContent = currentUser.email || currentUser.displayName || currentUser.uid;
+    } else {
+        // 未ログイン
+        authSection.style.display = 'block';
+        userSection.style.display = 'none';
+        if (savedFilesSection) {
+            savedFilesSection.style.display = 'none';
+        }
+    }
+}
 
     // メールでサインイン
     signInBtn.addEventListener('click', function() {
@@ -1885,7 +1919,4 @@ function loadSavedFilesList() {
             }
         });
     }
-    
-    // ページ読み込み時に認証状態を確認
-    updateUIBasedOnAuth();
 });
