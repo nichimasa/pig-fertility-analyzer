@@ -144,17 +144,22 @@ document.addEventListener('DOMContentLoaded', function() {
         return a.localeCompare(b);
     }
     
-    // 認証状態監視
-    let currentUser = null;
-    auth.onAuthStateChanged(user => {
-        currentUser = user;
-        updateUIBasedOnAuth();
-        
-        if (user) {
-            // ログイン済みなら保存ファイル一覧を読み込む
+   // 認証状態監視 (app.jsの初期部分で)
+auth.onAuthStateChanged(function(user) {
+    currentUser = user;
+    console.log("認証状態変更:", user ? "ログイン中" : "未ログイン");
+    
+    // UI更新
+    updateUIBasedOnAuth();
+    
+    // ログイン済みなら保存ファイル一覧を読み込む
+    if (user) {
+        console.log("ユーザーID:", user.uid);
+        setTimeout(() => { 
             loadSavedFilesList();
-        }
-    });
+        }, 1000);
+    }
+});
 
     // メールでサインイン
     signInBtn.addEventListener('click', function() {
@@ -433,54 +438,61 @@ function saveCSVToFirebase(fileName, csvData) {
     }
     
     // 保存済みファイル一覧を取得して表示
-    function loadSavedFilesList() {
-        if (!currentUser) return;
-        
-        savedFilesList.innerHTML = '<p>読み込み中...</p>';
-        
-        db.collection('users').doc(currentUser.uid).collection('csvFiles')
-            .orderBy('createdAt', 'desc')
-            .get()
-            .then(snapshot => {
-                if (snapshot.empty) {
-                    savedFilesSection.style.display = 'none';
-                    return;
-                }
-                
-                savedFilesSection.style.display = 'block';
-                savedFilesList.innerHTML = '';
-                
-                snapshot.forEach(doc => {
-                    const fileData = doc.data();
-                    const fileId = doc.id;
-                    
-                    const fileDate = fileData.saveDate ? new Date(fileData.saveDate) : new Date();
-                    const formattedDate = `${fileDate.getFullYear()}/${fileDate.getMonth()+1}/${fileDate.getDate()} ${fileDate.getHours()}:${String(fileDate.getMinutes()).padStart(2, '0')}`;
-                    
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'saved-file-item';
-                    fileItem.innerHTML = `
-                        <div class="saved-file-info">
-                            <div class="saved-file-name">${fileData.fileName}</div>
-                            <div class="saved-file-date">保存日時: ${formattedDate}</div>
-                        </div>
-                        <div class="saved-file-actions">
-                            <button class="load-file-btn" data-id="${fileId}">読み込み</button>
-                            <button class="delete-file-btn" data-id="${fileId}">削除</button>
-                        </div>
-                    `;
-                    
-                    savedFilesList.appendChild(fileItem);
-                });
-                
-                // イベントリスナーの設定
-                setupFileActionListeners();
-            })
-            .catch(error => {
-                console.error('ファイル一覧取得エラー:', error);
-                savedFilesList.innerHTML = '<p>ファイル一覧の取得に失敗しました</p>';
-            });
+function loadSavedFilesList() {
+    if (!currentUser) {
+        console.log("ファイル一覧読み込み: ユーザーがログインしていません");
+        return;
     }
+    
+    console.log("ファイル一覧読み込み開始:", currentUser.uid);
+    savedFilesList.innerHTML = '<p>読み込み中...</p>';
+    savedFilesSection.style.display = 'block';
+    
+    db.collection('users').doc(currentUser.uid).collection('csvFiles')
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then(snapshot => {
+            console.log("ファイル数:", snapshot.size);
+            
+            if (snapshot.empty) {
+                savedFilesList.innerHTML = '<p>保存されたファイルはありません</p>';
+                return;
+            }
+            
+            savedFilesList.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const fileData = doc.data();
+                const fileId = doc.id;
+                console.log("ファイル見つかりました:", fileData.fileName);
+                
+                const fileDate = fileData.saveDate ? new Date(fileData.saveDate) : new Date();
+                const formattedDate = `${fileDate.getFullYear()}/${fileDate.getMonth()+1}/${fileDate.getDate()} ${fileDate.getHours()}:${String(fileDate.getMinutes()).padStart(2, '0')}`;
+                
+                const fileItem = document.createElement('div');
+                fileItem.className = 'saved-file-item';
+                fileItem.innerHTML = `
+                    <div class="saved-file-info">
+                        <div class="saved-file-name">${fileData.fileName}</div>
+                        <div class="saved-file-date">保存日時: ${formattedDate}</div>
+                    </div>
+                    <div class="saved-file-actions">
+                        <button class="load-file-btn" data-id="${fileId}">読み込み</button>
+                        <button class="delete-file-btn" data-id="${fileId}">削除</button>
+                    </div>
+                `;
+                
+                savedFilesList.appendChild(fileItem);
+            });
+            
+            // イベントリスナーの設定
+            setupFileActionListeners();
+        })
+        .catch(error => {
+            console.error('ファイル一覧取得エラー:', error);
+            savedFilesList.innerHTML = `<p>ファイル一覧の取得に失敗しました: ${error.message}</p>`;
+        });
+}
     
     // ファイルアクションのイベントリスナー設定
     function setupFileActionListeners() {
