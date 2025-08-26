@@ -367,6 +367,18 @@ function updateUIBasedOnAuth() {
                 complete: function(results) {
                     console.log("Parsed data:", results);
                     allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
+                  try {
+                console.log("Firebase保存開始");
+                saveCSVToFirebase(selectedFile.name, allData)
+                    .then(() => {
+                        console.log("Firebase保存完了");
+                    })
+                    .catch(err => {
+                        console.error("Firebase保存エラー:", err);
+                    });
+            } catch (error) {
+                console.error("保存処理実行エラー:", error);
+            }
                     
                     // CSVデータをFirebaseに保存
 function saveCSVToFirebase(fileName, csvData) {
@@ -448,59 +460,76 @@ function saveCSVToFirebase(fileName, csvData) {
         }, 500);
     });
 
-    // CSVデータをFirebaseに保存
-    function saveCSVToFirebase(fileName, csvData) {
-        if (!currentUser) {
-            alert('保存するにはログインしてください');
-            return;
-        }
+    // CSVデータをFirebaseに保存（シンプル版）
+function saveCSVToFirebase(fileName, csvData) {
+    console.log("保存関数開始:", fileName);
+    
+    if (!currentUser) {
+        console.error("ユーザーがログインしていません");
+        alert('保存するにはログインしてください');
+        return Promise.reject("未ログイン");
+    }
+    
+    // 基本情報
+    const userId = currentUser.uid;
+    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    const saveDate = new Date().toISOString();
+    
+    console.log("保存ユーザー:", userId);
+    console.log("データ件数:", csvData.length);
+    
+    // メタデータ保存
+    return db.collection('users').doc(userId).collection('csvFiles').add({
+        fileName: fileName,
+        saveDate: saveDate,
+        createdAt: timestamp,
+        dataCount: csvData.length
+    })
+    .then(docRef => {
+        console.log("メタデータ保存完了:", docRef.id);
         
-        // 保存日時
-        const saveDate = new Date().toISOString();
+        // JSONデータ作成
+        const jsonData = JSON.stringify(csvData);
+        const storagePath = `users/${userId}/csvFiles/${docRef.id}.json`;
         
-        // メタデータをFirestoreに保存
-        db.collection('users').doc(currentUser.uid).collection('csvFiles').add({
-            fileName: fileName,
-            saveDate: saveDate,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        })
-        .then(docRef => {
-            // ファイルIDを取得
-            const fileId = docRef.id;
-            
-            // CSVデータをJSON文字列化
-            const jsonData = JSON.stringify(csvData);
-            
-            // Storageにデータを保存
-            const storagePath = `users/${currentUser.uid}/csvFiles/${fileId}.json`;
-            const storageRef = storage.ref(storagePath);
-            
-            return storageRef.putString(jsonData, 'raw')
-                .then(() => {
-                    console.log(`ファイル「${fileName}」を保存しました`);
-                    // 保存済みファイル一覧を更新
-                    loadSavedFilesList();
-                    return fileId;
-                });
-        })
+        console.log("Storage保存開始:", storagePath);
+        return storage.ref(storagePath).putString(jsonData, 'raw');
+    })
+    .then(() => {
+        console.log("Storage保存完了");
+        alert(`ファイル「${fileName}」を保存しました`);
+        
+        // 一覧更新
+        setTimeout(loadSavedFilesList, 1000);
+        return true;
+    })
         .catch(error => {
             console.error('保存エラー:', error);
             alert('ファイルの保存に失敗しました');
         });
     }
     
-    // 保存済みファイル一覧を取得して表示
+    // 保存済みファイル一覧を取得（シンプル版）
 function loadSavedFilesList() {
+    console.log("ファイル一覧読み込み開始");
+    
     if (!currentUser) {
-        console.log("ファイル一覧読み込み: ユーザーがログインしていません");
+        console.log("ユーザーがログインしていません");
         return;
     }
     
-    console.log("ファイル一覧読み込み開始:", currentUser.uid);
-    savedFilesList.innerHTML = '<p>読み込み中...</p>';
-    savedFilesSection.style.display = 'block';
+    const userId = currentUser.uid;
+    console.log("ユーザーID:", userId);
     
-    db.collection('users').doc(currentUser.uid).collection('csvFiles')
+    if (!savedFilesSection || !savedFilesList) {
+        console.error("UI要素が見つかりません");
+        return;
+    }
+    
+    savedFilesSection.style.display = 'block';
+    savedFilesList.innerHTML = '<p>読み込み中...</p>';
+    
+    db.collection('users').doc(userId).collection('csvFiles')
         .orderBy('createdAt', 'desc')
         .get()
         .then(snapshot => {
@@ -516,7 +545,7 @@ function loadSavedFilesList() {
             snapshot.forEach(doc => {
                 const fileData = doc.data();
                 const fileId = doc.id;
-                console.log("ファイル見つかりました:", fileData.fileName);
+                console.log("ファイル読み込み:", fileId, fileData.fileName);
                 
                 const fileDate = fileData.saveDate ? new Date(fileData.saveDate) : new Date();
                 const formattedDate = `${fileDate.getFullYear()}/${fileDate.getMonth()+1}/${fileDate.getDate()} ${fileDate.getHours()}:${String(fileDate.getMinutes()).padStart(2, '0')}`;
@@ -541,7 +570,7 @@ function loadSavedFilesList() {
             setupFileActionListeners();
         })
         .catch(error => {
-            console.error('ファイル一覧取得エラー:', error);
+            console.error("ファイル一覧エラー:", error);
             savedFilesList.innerHTML = `<p>ファイル一覧の取得に失敗しました: ${error.message}</p>`;
         });
 }
