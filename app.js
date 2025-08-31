@@ -367,28 +367,18 @@ function updateUIBasedOnAuth() {
                 complete: function(results) {
                     console.log("Parsed data:", results);
                     allData = results.data.filter(row => row['種付日'] && row['種付日'].trim() !== '');
-                  try {
-                console.log("Firebase保存開始");
-                saveCSVToFirebase(selectedFile.name, allData)
-                    .then(() => {
-                        console.log("Firebase保存完了");
-                    })
-                    .catch(err => {
-                        console.error("Firebase保存エラー:", err);
-                    });
-            } catch (error) {
-                console.error("保存処理実行エラー:", error);
-            }
-
-            // CSVデータをFirebaseに保存（シンプル版）
-function saveCSVToFirebase(fileName, csvData) {
-    console.log("保存関数開始:", fileName);
-    
-    if (!currentUser) {
-        console.error("ユーザーがログインしていません");
-        alert('保存するにはログインしてください');
-        return Promise.reject("未ログイン");
-    }
+                try {
+    console.log("Firebase保存開始");
+    saveCSVToFirebase(selectedFile.name, allData)
+        .then(() => {
+            console.log("Firebase保存完了");
+        })
+        .catch(err => {
+            console.error("Firebase保存エラー:", err);
+        });
+} catch (error) {
+    console.error("保存処理実行エラー:", error);
+}
     
     // 基本情報
     const userId = currentUser.uid;
@@ -428,17 +418,7 @@ function saveCSVToFirebase(fileName, csvData) {
         alert('ファイルの保存に失敗しました');
         throw error;
     });
-}
-
-// 保存済みファイル一覧を取得
-function loadSavedFilesList() {
-    console.log("ファイル一覧読み込み開始");
-    
-    if (!currentUser) {
-        console.log("ユーザーがログインしていません");
-        return;
-    }
-    
+}   
     const userId = currentUser.uid;
     console.log("ユーザーID:", userId);
     
