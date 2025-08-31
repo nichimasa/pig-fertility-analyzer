@@ -380,6 +380,122 @@ function updateUIBasedOnAuth() {
                 console.error("保存処理実行エラー:", error);
             }
 
+            // CSVデータをFirebaseに保存（シンプル版）
+function saveCSVToFirebase(fileName, csvData) {
+    console.log("保存関数開始:", fileName);
+    
+    if (!currentUser) {
+        console.error("ユーザーがログインしていません");
+        alert('保存するにはログインしてください');
+        return Promise.reject("未ログイン");
+    }
+    
+    // 基本情報
+    const userId = currentUser.uid;
+    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    const saveDate = new Date().toISOString();
+    
+    console.log("保存ユーザー:", userId);
+    console.log("データ件数:", csvData.length);
+    
+    // メタデータ保存
+    return db.collection('users').doc(userId).collection('csvFiles').add({
+        fileName: fileName,
+        saveDate: saveDate,
+        createdAt: timestamp,
+        dataCount: csvData.length
+    })
+    .then(docRef => {
+        console.log("メタデータ保存完了:", docRef.id);
+        
+        // JSONデータ作成
+        const jsonData = JSON.stringify(csvData);
+        const storagePath = `users/${userId}/csvFiles/${docRef.id}.json`;
+        
+        console.log("Storage保存開始:", storagePath);
+        return storage.ref(storagePath).putString(jsonData, 'raw');
+    })
+    .then(() => {
+        console.log("Storage保存完了");
+        alert(`ファイル「${fileName}」を保存しました`);
+        
+        // 一覧更新
+        setTimeout(loadSavedFilesList, 1000);
+        return true;
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('ファイルの保存に失敗しました');
+        throw error;
+    });
+}
+
+// 保存済みファイル一覧を取得
+function loadSavedFilesList() {
+    console.log("ファイル一覧読み込み開始");
+    
+    if (!currentUser) {
+        console.log("ユーザーがログインしていません");
+        return;
+    }
+    
+    const userId = currentUser.uid;
+    console.log("ユーザーID:", userId);
+    
+    if (!savedFilesSection || !savedFilesList) {
+        console.error("UI要素が見つかりません");
+        return;
+    }
+    
+    savedFilesSection.style.display = 'block';
+    savedFilesList.innerHTML = '<p>読み込み中...</p>';
+    
+    db.collection('users').doc(userId).collection('csvFiles')
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then(snapshot => {
+            console.log("ファイル数:", snapshot.size);
+            
+            if (snapshot.empty) {
+                savedFilesList.innerHTML = '<p>保存されたファイルはありません</p>';
+                return;
+            }
+            
+            savedFilesList.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const fileData = doc.data();
+                const fileId = doc.id;
+                console.log("ファイル読み込み:", fileId, fileData.fileName);
+                
+                const fileDate = fileData.saveDate ? new Date(fileData.saveDate) : new Date();
+                const formattedDate = `${fileDate.getFullYear()}/${fileDate.getMonth()+1}/${fileDate.getDate()} ${fileDate.getHours()}:${String(fileDate.getMinutes()).padStart(2, '0')}`;
+                
+                const fileItem = document.createElement('div');
+                fileItem.className = 'saved-file-item';
+                fileItem.innerHTML = `
+                    <div class="saved-file-info">
+                        <div class="saved-file-name">${fileData.fileName}</div>
+                        <div class="saved-file-date">保存日時: ${formattedDate}</div>
+                    </div>
+                    <div class="saved-file-actions">
+                        <button class="load-file-btn" data-id="${fileId}">読み込み</button>
+                        <button class="delete-file-btn" data-id="${fileId}">削除</button>
+                    </div>
+                `;
+                
+                savedFilesList.appendChild(fileItem);
+            });
+            
+            // イベントリスナーの設定
+            setupFileActionListeners();
+        })
+        .catch(error => {
+            console.error("ファイル一覧エラー:", error);
+            savedFilesList.innerHTML = `<p>ファイル一覧の取得に失敗しました: ${error.message}</p>`;
+        });
+}
+
     // 農場1の各種リストを抽出
     function extractFarm1Lists() {
         // 年リスト抽出
